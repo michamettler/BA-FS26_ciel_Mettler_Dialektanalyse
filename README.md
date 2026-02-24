@@ -8,7 +8,7 @@
 # ffmpeg
 brew install ffmpeg
 
-# virtuelle Umgebung
+# virtual environment
 python3 -m venv venv
 source venv/bin/activate
 
@@ -25,7 +25,7 @@ pip install -r requirements.txt
 # ffmpeg
 winget install ffmpeg
 
-# virtuelle Umgebung
+# virtual environment
 python -m venv venv
 venv\Scripts\activate
 
@@ -34,18 +34,24 @@ pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-> **NVIDIA GPU?** Torch mit CUDA statt der CPU-Version:
+> **NVIDIA GPU?** Install torch with CUDA instead of the CPU version:
 > ```bash
 > pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu121
 > ```
-> Diese Zeile **vor** `pip install -r requirements.txt` ausführen.
+> Run this line **before** `pip install -r requirements.txt`.
 >
-> Falls `pip install -r` bereits gelaufen ist, torch nachträglich überschreiben:
+> If `pip install -r` has already been run, overwrite torch afterwards:
 > ```bash
 > pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu121 --force-reinstall
 > ```
 >
-> CUDA-Version prüfen (oben rechts in der Ausgabe):
+> Check your CUDA version (top right of the output):
 > ```bash
 > nvidia-smi
+> ```
+>
+> Verify CUDA is detected:
+> ```python
+> import torch
+> print(torch.cuda.is_available())  # should print True
 > ```
