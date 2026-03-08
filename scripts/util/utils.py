@@ -8,15 +8,14 @@ import pandas as pd
 
 def clean(text):
     """Cleans and normalizes text for comparison.
-    - Lowercase (Groß-/Kleinschreibung)
-    - ß → ss (Doppel-S, Swiss German convention)
-    - Remove punctuation and special characters (Satz-/Sonderzeichen)
+    - Lowercase
+    - Doppel-S, Swiss German convention
+    - Remove punctuation and special characters
     """
     if pd.isna(text):
         return ""
     text = str(text).lower()
     text = text.replace('ß', 'ss')
-    # Keep only a-z, digits, and German umlauts — strips any non-Latin/non-German Unicode
     text = re.sub(r'[^a-z0-9äöü\s]', '', text)
     return text.strip()
 
@@ -60,8 +59,8 @@ def calculate_position_score(src_index, target_index, max_len):
 
 
 def combined_score_weighted(lev_sim, position_score, alpha=0.7):
-    """Weighted average: α · lev_sim + (1-α) · position_score.
-    α=0.7 weights lexical similarity higher than positional similarity.
+    """Weighted average: alpha · lev_sim + (1-alpha) · position_score.
+    alpha=0.7 weights lexical similarity higher than positional similarity.
     Higher = better match."""
     return round(alpha * lev_sim + (1 - alpha) * position_score, 3)
 
