@@ -23,7 +23,7 @@ def run_extraction(count=100, region="Zürich"):
         print(f"Error: Could not find {SOURCE_TSV}")
         return
 
-    df = pd.read_csv(SOURCE_TSV, sep='\t', encoding='utf-8')
+    df = pd.read_csv(SOURCE_TSV, sep='\t', encoding='utf-8-sig')
     zh_df = df[df['dialect_region'] == region].sample(n=count, random_state=42)
 
     successful_samples = []

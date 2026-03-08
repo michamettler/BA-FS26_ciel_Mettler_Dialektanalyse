@@ -16,8 +16,8 @@ OUTPUT_CSV_NED = ANALYSIS_DIR / "cross-comparison_ned.csv"
 def generate_csv():
     print("--- Generating Word-Level CSV for SQL/Analysis ---")
 
-    df_dat = pd.read_csv(DAT_TSV, sep='\t', encoding='utf-8')
-    df_dit = pd.read_csv(DIT_TSV, sep='\t', encoding='utf-8')
+    df_dat = pd.read_csv(DAT_TSV, sep='\t', encoding='utf-8-sig')
+    df_dit = pd.read_csv(DIT_TSV, sep='\t', encoding='utf-8-sig')
 
     df_dit = df_dit.rename(columns={'sentence': 'sentence_dit'})  # avoid collision
     df = pd.merge(df_dat, df_dit[['path', 'DIT']], on='path', how='inner')

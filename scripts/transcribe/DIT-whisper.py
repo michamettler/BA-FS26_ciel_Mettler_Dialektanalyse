@@ -17,7 +17,7 @@ def run_dit():
         print(f"Error: {SOURCE_TSV} not found.")
         return
 
-    df = pd.read_csv(SOURCE_TSV, sep='\t', encoding='utf-8')
+    df = pd.read_csv(SOURCE_TSV, sep='\t', encoding='utf-8-sig')
     transcriptions = []
 
     print(f"Transcribing {len(df)} files for DIT...")
