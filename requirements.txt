@@ -3,3 +3,6 @@ numpy
 openai-whisper
 torch
 torchaudio
+jupyter
+ipykernel
+nbformat
