@@ -1,6 +1,6 @@
 import pandas as pd
 from pathlib import Path
-from utils import (
+from scripts.util.utils import (
     clean,
     build_word_comparison_df,
 )
