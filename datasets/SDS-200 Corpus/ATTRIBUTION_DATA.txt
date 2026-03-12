@@ -1,0 +1,3 @@
+Plüss, M., Hürlimann, M., Cuny, M., Stöckli, A., Kapotis, N., Hartmann, J., Ulasik, M.A., Scheller, C., Schraner, Y., Jain, A., Deriu, J., Cieliebak, M. & Vogel, M. 
+"SDS-200: A Swiss German Speech to Standard German Text Corpus". 
+13th Language Resources and Evaluation Conference (LREC) 2022. European Language Resources Association (ELRA), 2022.

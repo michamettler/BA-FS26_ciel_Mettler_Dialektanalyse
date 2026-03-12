@@ -7,9 +7,9 @@ __pycache__/
 *.so
 
 # Datasets & Audiofiles
-datasets
 *.mp3
 *.flac
+*.tar
 
 # Distribution / packaging
 .Python
