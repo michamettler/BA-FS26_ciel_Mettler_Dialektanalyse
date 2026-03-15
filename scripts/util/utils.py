@@ -90,6 +90,7 @@ def calculate_score_harmonic(word_score, position_score):
 
 def evaluate_scores(alpha: float, target_word: str, src_word: str, global_max_word_length, position_score: float) -> \
         tuple[float, float, float]:
+    """Calculates the word_score, score_weighted and score_harmonic for a given source word and target word (DIT/DAT)."""
     if target_word is not None:
         lev_distance = calculate_levenshtein_distance(src_word, target_word)
         word_score = normalize_levenshtein_distance(lev_distance, global_max_word_length)
