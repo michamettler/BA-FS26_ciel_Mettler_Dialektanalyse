@@ -107,12 +107,15 @@ def evaluate_scores(alpha: float, target_word: str, src_word: str, global_max_wo
     return score_harmonic, score_weighted, word_score
 
 
-def build_word_comparison_df(
+def generate_cross_comparison_df(
         df, global_max_word_length, global_max_sentence_length, alpha=0.5
 ):
-    """Build the word-level cross-comparison DataFrame.
-    For each source word, compares it to each target word position in both DAT and DIT transcriptions.
-    Returns a DataFrame with one row per (clip, src_word_index, target_word_index) triple.
+    """Generates a DataFrame where each row corresponds to a comparison between a source word and a target word (DIT and DAT).
+    We compare each source word to every word in the target sentences (DIT and DAT) to capture all possible alignments, 
+    not just same-index pairs, since word order can differ.
+    The calculated scores (Levenshtein similarity, position similarity, weighted and harmonic) allow us to analyze how closely 
+    the DIT and DAT sentences match the source sentence at the word level, accounting for both lexical similarity and 
+    positional alignment.
     """
     word_rows = []
 
