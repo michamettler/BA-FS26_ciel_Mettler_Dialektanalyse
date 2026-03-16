@@ -65,7 +65,7 @@ def calculate_position_score(src_index, target_index, global_max_sentence_length
     if global_max_sentence_length > 1:
         distance_to_target_word = abs(src_index - target_index)
         max_possible_distance = (
-                global_max_sentence_length - 1
+            global_max_sentence_length - 1
         )  # -1 because max index gap in a sequence of length n is n-1
         return round(1.0 - (distance_to_target_word / max_possible_distance), 3)
     else:
@@ -86,93 +86,3 @@ def calculate_score_harmonic(word_score, position_score):
     if word_score + position_score == 0:
         return 0.0
     return round(2 * word_score * position_score / (word_score + position_score), 3)
-
-
-def evaluate_scores(alpha: float, target_word: str, src_word: str, global_max_word_length, position_score: float) -> \
-        tuple[float, float, float]:
-    """Calculates the word_score, score_weighted and score_harmonic for a given source word and target word (DIT/DAT)."""
-    if target_word is not None:
-        lev_distance = calculate_levenshtein_distance(src_word, target_word)
-        word_score = normalize_levenshtein_distance(lev_distance, global_max_word_length)
-
-        score_weighted = calculate_score_weighted(
-            word_score, position_score, alpha
-        )
-        score_harmonic = calculate_score_harmonic(
-            word_score, position_score
-        )
-    else:
-        word_score = 0.0
-        score_weighted = 0.0
-        score_harmonic = 0.0
-    return score_harmonic, score_weighted, word_score
-
-
-def generate_cross_comparison_df(
-        df, global_max_word_length, global_max_sentence_length, alpha=0.5
-):
-    """Generates a DataFrame where each row corresponds to a comparison between a source word and a target word (DIT and DAT).
-    We compare each source word to every word in the target sentences (DIT and DAT) to capture all possible alignments, 
-    not just same-index pairs, since word order can differ.
-    The calculated scores (Levenshtein similarity, position similarity, weighted and harmonic) allow us to analyze how closely 
-    the DIT and DAT sentences match the source sentence at the word level, accounting for both lexical similarity and 
-    positional alignment.
-    """
-    word_rows = []
-
-    for _, row in df.iterrows():
-        clip_id = row["path"]
-
-        # create list of words for source, DIT and DAT sentence & clean them
-        src_words = [clean(w) for w in str(row["sentence"]).split()]
-        dit_words = [clean(w) for w in str(row["DIT"]).split()]
-        dat_words = [clean(w) for w in str(row["DAT"]).split()]
-
-        n_src_words = len(src_words)  # number of words in source sentence
-        n_dit_words = len(dit_words)  # number of words in DIT target sentence
-        n_dat_words = len(dat_words)  # number of words in DAT target sentence
-
-        for i, src_word in enumerate(src_words):
-            for j in range(
-                    max(
-                        n_dit_words, n_dat_words
-                    )  # take max to cover all words in both targets
-            ):
-                dit_word = dit_words[j] if j < n_dit_words else None
-                dat_word = dat_words[j] if j < n_dat_words else None
-
-                position_score = calculate_position_score(
-                    i, j, global_max_sentence_length
-                )  # position accounts for both DIT and DAT since they are aligned by index
-
-                (dit_score_harmonic,
-                 dit_score_weighted,
-                 dit_word_score) = evaluate_scores(alpha, dit_word, src_word, global_max_word_length, position_score)
-
-                (dat_score_harmonic,
-                 dat_score_weighted,
-                 dat_word_score) = evaluate_scores(alpha, dat_word, src_word, global_max_word_length, position_score)
-
-                word_rows.append(
-                    {
-                        "clip_id": clip_id,
-                        "src_word_index": i,
-                        "target_word_index": j,
-                        "is_same_position": 1 if i == j else 0,
-                        "src_word": src_word,
-                        "dit_word": dit_word,
-                        "dat_word": dat_word,
-                        "dit_word_score": dit_word_score,
-                        "dat_word_score": dat_word_score,
-                        "position_score": position_score,
-                        "dit_score_weighted": dit_score_weighted,
-                        "dit_score_harmonic": dit_score_harmonic,
-                        "dat_score_weighted": dat_score_weighted,
-                        "dat_score_harmonic": dat_score_harmonic,
-                        "src_len": n_src_words,
-                        "dit_len": n_dit_words,
-                        "dat_len": n_dat_words,
-                    }
-                )
-
-    return pd.DataFrame(word_rows)
