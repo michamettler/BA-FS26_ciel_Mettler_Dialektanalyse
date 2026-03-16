@@ -6,7 +6,8 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 STT_DIR = PROJECT_ROOT / "datasets" / "STT4SG-350 v2.1"
 SOURCE_TSV = STT_DIR / "train_balanced.tsv"
 
-TARGET_DIR = PROJECT_ROOT / "samples"
+TARGET_DIR = PROJECT_ROOT / "samples" / "zurich_subset"
+TARGET_CSV = TARGET_DIR / "subset_metadata.tsv"
 CLIPS_DIR = TARGET_DIR / "clips"
 CLIPS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -47,8 +48,8 @@ def run_extraction(count=100, region="Zürich"):
             print(f"Warning: Audio file {file_name} not found.")
 
     output_df = pd.DataFrame(successful_samples)
-    output_tsv = TARGET_DIR / "subset_metadata.tsv"
-    output_df.to_csv(output_tsv, sep="\t", index=False, encoding="utf-8")
+    output_tsv = TARGET_CSV
+    output_df.to_csv(output_tsv, sep="\t", index=False, encoding="utf-8-sig")
 
     print(
         f"\nDone! {len(successful_samples)} files copied, metadata saved to: {output_tsv}"
