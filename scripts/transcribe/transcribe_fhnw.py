@@ -16,7 +16,10 @@ def _extract_uuid(result_text: str) -> str | None:
     return match.group(1) if match else None
 
 
-def transcribe(target_type, output_tsv, subset):
+def transcribe(output_tsv, subset):
+    """
+    Partly help from AI for file mgmt, prompts based on folder c4c03e6f-50a2-4d24-ae88-caf3032798fa
+    """
     analysis_dir = PROJECT_ROOT / "samples" / subset
     source_tsv = analysis_dir / "subset_metadata.tsv"
 
@@ -30,7 +33,7 @@ def transcribe(target_type, output_tsv, subset):
     df = pd.read_csv(source_tsv, sep="\t", encoding="utf-8-sig")
     transcriptions = []
 
-    print(f"Transcribing {len(df)} files for {target_type}...")
+    print(f"Transcribing {len(df)} files ...")
     for _, row in tqdm(df.iterrows(), total=len(df)):
         audio_path = analysis_dir / row["path"]
         if not audio_path.exists():
@@ -63,8 +66,8 @@ def transcribe(target_type, output_tsv, subset):
             print(f"\nError on {audio_path.name}: {e}")
             transcriptions.append("ERROR: TRANSCRIPTION FAILED")
 
-    df[target_type] = transcriptions
+    df["transcript"] = transcriptions
     output_path = analysis_dir / "fhnw" / output_tsv
     output_path.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(output_path, sep="\t", index=False, encoding="utf-8-sig")
-    print(f"\nSuccess! {target_type} file saved at: {output_path}")
+    print(f"\nSuccess! File saved at: {output_path}")

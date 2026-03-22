@@ -5,7 +5,7 @@ Cross-comparison logic for word-level dialect analysis.
 import pandas as pd
 
 from domain.models import WordScore
-from scripts.domain.calculations import (
+from domain.calculations import (
     clean,
     calculate_levenshtein_distance,
     normalize_levenshtein_distance,
