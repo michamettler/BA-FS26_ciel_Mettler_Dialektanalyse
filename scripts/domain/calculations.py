@@ -4,6 +4,7 @@ Shared helper functions for dialect analysis scripts.
 
 import re
 import pandas as pd
+import Levenshtein
 
 
 def clean(text):
@@ -11,7 +12,7 @@ def clean(text):
     - Lowercase
     - Doppel-S, Swiss German convention
     - Remove punctuation and special characters
-    - Only allow a-z, digits, and German umlauts (äöü) — strips any non-Latin/non-German Unicode
+    - Only allow a-z, digits, and German umlauts (äöü) - strips any non-Latin/non-German Unicode
     """
     if pd.isna(text):
         return ""
@@ -22,31 +23,10 @@ def clean(text):
 
 
 def calculate_levenshtein_distance(src_word, target_word):
-    """Wagner-Fischer DP for Levenshtein edit distance.
+    """Levenshtein edit distance using python-Levenshtein library.
     Returns the number of edits (insertions, deletions, substitutions) needed to transform src_word into target_word.
     """
-    if src_word == target_word:
-        return 0
-    if len(src_word) == 0:
-        return len(target_word)
-    if len(target_word) == 0:
-        return len(src_word)
-
-    matrix = [[0] * (len(target_word) + 1) for _ in range(len(src_word) + 1)]
-    for i in range(len(src_word) + 1):
-        matrix[i][0] = i
-    for j in range(len(target_word) + 1):
-        matrix[0][j] = j
-
-    for i in range(1, len(src_word) + 1):
-        for j in range(1, len(target_word) + 1):
-            cost = 0 if src_word[i - 1] == target_word[j - 1] else 1
-            matrix[i][j] = min(
-                matrix[i - 1][j] + 1,  # deletion
-                matrix[i][j - 1] + 1,  # insertion
-                matrix[i - 1][j - 1] + cost,  # substitution
-            )
-    return matrix[-1][-1]
+    return Levenshtein.distance(src_word, target_word)
 
 
 def normalize_levenshtein_distance(distance, global_max_word_length):
