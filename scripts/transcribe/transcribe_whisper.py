@@ -9,7 +9,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
 def transcribe(model_name, output_tsv, usePrompts:bool, subset):
     """
-    Partly help from AI for file mgmt, prompts based on folder c4c03e6f-50a2-4d24-ae88-caf3032798fa
+    Partly AI generated code for file mgmt, prompts based on folder c4c03e6f-50a2-4d24-ae88-caf3032798fa
     """
     analysis_dir = PROJECT_ROOT / "samples" / subset
     source_tsv = analysis_dir / "subset_metadata.tsv"

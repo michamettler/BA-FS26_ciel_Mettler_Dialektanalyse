@@ -18,7 +18,7 @@ def _extract_uuid(result_text: str) -> str | None:
 
 def transcribe(output_tsv, subset):
     """
-    Partly help from AI for file mgmt, prompts based on folder c4c03e6f-50a2-4d24-ae88-caf3032798fa
+    Partly AI generated code for file mgmt & api call
     """
     analysis_dir = PROJECT_ROOT / "samples" / subset
     source_tsv = analysis_dir / "subset_metadata.tsv"

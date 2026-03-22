@@ -15,6 +15,12 @@ AUDIO_SOURCES = [STT_DIR / "clips__test", STT_DIR / "clips__train_valid-001"]
 
 
 def run_extraction(count=100, region="Zürich"):
+    """_summary_
+    AI generated code to extract samples from dateset.
+    Args:
+        count (int, optional): _description_. Defaults to 100.
+        region (str, optional): _description_. Defaults to "Zürich".
+    """
     print(f"--- Starting Extraction: {region} ---")
 
     if not SOURCE_TSV.exists():

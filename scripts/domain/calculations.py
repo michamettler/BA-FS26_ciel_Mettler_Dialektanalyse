@@ -46,7 +46,7 @@ def calculate_position_score(src_index, target_index, global_max_sentence_length
         distance_to_target_word = abs(src_index - target_index)
         max_possible_distance = (
             global_max_sentence_length - 1
-        )  # -1 because max index gap in a sequence of length n is n-1
+        )  # -1 because max index gap in a sequence of length n is n-1, needed for worst case to be 0
         return round(1.0 - (distance_to_target_word / max_possible_distance), 3)
     else:
         return 1.0  # sentence only has 0 or 1 word, so position is irrelevant - treat as perfect match

@@ -12,5 +12,5 @@ if __name__ == "__main__":
     #transcribe_whisper("large-v3", "DAT", "dialect-aware-transcript-v3.tsv", "zurich_subset")
     #transcribe_fhnw("DAT", "dialect-aware-transcript-fhnw.tsv", "zurich_subset")
     #transcribe_whisper("large-v1", "DIT", "dialect-ignorant-transcript-v1-prompted.tsv", "zurich_subset")
-    transcribe_whisper("large-v2", "DAT", "dialect-ignorant-transcript-v2-prompted.tsv", "zurich_subset")
+    #transcribe_whisper("large-v2", "DAT", "dialect-ignorant-transcript-v2-prompted.tsv", "zurich_subset")
     transcribe_whisper("large-v3", "DAT", "dialect-ignorant-transcript-v3-prompted.tsv", "zurich_subset")
