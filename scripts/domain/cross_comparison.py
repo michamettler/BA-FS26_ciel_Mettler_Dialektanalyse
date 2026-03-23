@@ -57,6 +57,7 @@ def generate_cross_comparison_df(
                 global_max_sentence_length,
             )
 
+            ## TODO this currently only works for sentences with same amount of words. Think about solution with epsilon's.
             for dit, dat in zip(dit_scores, dat_scores):
                 word_rows.append(
                     {
