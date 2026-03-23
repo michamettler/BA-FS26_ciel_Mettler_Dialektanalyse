@@ -1,5 +1,6 @@
 from transcribe_whisper import transcribe as transcribe_whisper
 from transcribe_fhnw import transcribe as transcribe_fhnw
+from transcribe_wac2vec2 import transcribe as transcribe_wac2vec2
 
 if __name__ == "__main__":
     # DIT
@@ -13,4 +14,4 @@ if __name__ == "__main__":
     #transcribe_fhnw("DAT", "dialect-aware-transcript-fhnw.tsv", "zurich_subset")
     #transcribe_whisper("large-v1", "DIT", "dialect-ignorant-transcript-v1-prompted.tsv", "zurich_subset")
     #transcribe_whisper("large-v2", "DAT", "dialect-ignorant-transcript-v2-prompted.tsv", "zurich_subset")
-    transcribe_whisper("large-v3", "DAT", "dialect-ignorant-transcript-v3-prompted.tsv", "zurich_subset")
+    transcribe_wac2vec2("dialect-ignorant-transcript-wac2vec.tsv", "zurich_subset")
