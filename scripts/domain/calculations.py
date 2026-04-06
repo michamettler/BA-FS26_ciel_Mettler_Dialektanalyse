@@ -7,7 +7,7 @@ import pandas as pd
 import Levenshtein
 
 
-def clean(text):
+def clean(text: str) -> str:
     """Cleans and normalizes text for comparison.
     - Lowercase
     - Doppel-S, Swiss German convention
@@ -22,47 +22,60 @@ def clean(text):
     return text.strip()
 
 
-def calculate_levenshtein_distance(src_word, target_word):
-    """Levenshtein edit distance using python-Levenshtein library.
-    Returns the number of edits (insertions, deletions, substitutions) needed to transform src_word into target_word.
+def calculate_word_similarity_global(
+    src_word: str, target_word: str, global_max_word_length: int
+) -> float:
+    """Calculate & normalize Levenshtein edit distance using python-Levenshtein library.
+    Normalization based on param global_max_word_length to achieve comparable similarities.
+    Returns the normalized number of edits (insertions, deletions, substitutions) needed to transform src_word into target_word.
     """
-    return Levenshtein.distance(src_word, target_word)
+    distance = Levenshtein.distance(src_word, target_word)
 
-
-def normalize_levenshtein_distance(distance, global_max_word_length):
-    """Normalised Levenshtein similarity in [0.0, 1.0]. Higher = more similar."""
     if global_max_word_length > 0:
-        return round(1 - (distance / global_max_word_length), 3)
+        return 1 - (distance / global_max_word_length)
     else:
         return 1.0
 
 
-def calculate_position_score(src_index, target_index, global_max_sentence_length):
+def calculate_word_similarity_local(src_word: str, target_word: str) -> float:
+    """Calculate & normalize Levenshtein edit distance using python-Levenshtein library.
+    Normalization handled by the library, based on lengths of source and target word.
+    Similarity = (len(src) + len(target) - distance) / (len(src) + len(target))
+    Returns similarity in [0.0, 1.0]. Higher = more similar.
+    """
+    return Levenshtein.ratio(src_word, target_word)
+
+
+def calculate_position_score(
+    src_index: int, target_index: int, global_max_sentence_length: int
+) -> float:
     """Normalised position similarity in [0.0, 1.0]. 1 = same position, 0 = max gap.
     Calculates how close the target word's position is to the source word's position,
-    normalised by the maximum sentence length to account for different sentence lengths.
+    normalized by the maximum sentence length to account for different sentence lengths.
     """
     if global_max_sentence_length > 1:
         distance_to_target_word = abs(src_index - target_index)
         max_possible_distance = (
             global_max_sentence_length - 1
         )  # -1 because max index gap in a sequence of length n is n-1, needed for worst case to be 0
-        return round(1.0 - (distance_to_target_word / max_possible_distance), 3)
+        return 1.0 - (distance_to_target_word / max_possible_distance)
     else:
         return 1.0  # sentence only has 0 or 1 word, so position is irrelevant - treat as perfect match
 
 
-def calculate_score_weighted(word_score, position_score, alpha=0.5):
-    """Weighted average: alpha * word_score + (1-alpha) * position_score.
+def calculate_score_weighted(
+    word_score: float, position_score: float, alpha=0.5
+) -> float:
+    """Weighted average: alpha * word_score + (1-alpha) * position_score in [0, 1]. Higher = better match
     Default alpha=0.5 weights lexical and positional similarity equally.
-    Higher = better match."""
-    return round(alpha * word_score + (1 - alpha) * position_score, 3)
+    """
+    return alpha * word_score + (1 - alpha) * position_score
 
 
-def calculate_score_harmonic(word_score, position_score):
+def calculate_score_harmonic(word_score: float, position_score: float) -> float:
     """Harmonic mean (F1-style) of word_score and position_score.
     Penalises pairs where either score is low. Higher = better match.
     Based on: van Rijsbergen (1979). Information Retrieval. Butterworths."""
     if word_score + position_score == 0:
         return 0.0
-    return round(2 * word_score * position_score / (word_score + position_score), 3)
+    return 2 * word_score * position_score / (word_score + position_score)
