@@ -75,12 +75,14 @@ def _extract_uuid(result_text: str) -> str | None:
 
 def transcribe_single(audio_path: Path, max_retries: int = 3, delay: float = 0.5) -> str:
     """Transcribe one audio file via the FHNW Gradio API (thread-safe)."""
+    httpx_timeout = {"timeout": 60.0}  # 60s timeout for all HTTP requests
+
     for attempt in range(max_retries):
         if _shutdown.is_set():
             return "ERROR: SHUTDOWN"
         time.sleep(delay)
         try:
-            upload_client = Client(UPLOAD_URL, verbose=False)
+            upload_client = Client(UPLOAD_URL, verbose=False, httpx_kwargs=httpx_timeout)
             upload_result = upload_client.predict(
                 file_path=handle_file(str(audio_path)),
                 api_name="/handle_upload",
@@ -94,7 +96,7 @@ def transcribe_single(audio_path: Path, max_retries: int = 3, delay: float = 0.5
 
             status_client = Client(
                 STATUS_URL,
-                httpx_kwargs={"params": {"uuid": uuid}},
+                httpx_kwargs={"params": {"uuid": uuid}, "timeout": 60.0},
                 verbose=False,
             )
 
