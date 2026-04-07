@@ -153,8 +153,8 @@ def solve_matching(G: nx.DiGraph) -> dict[str, str]:
 
 # ── quick test ───────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    dit = clean("Der Hahn ist eines Morgens krähen gegangen").split()
-    dat = clean("De Güggel isch eines Morgens go chrähe").split()
+    dit = clean("Ein Missgeschick nach dem andern traf sie: die Geschirre zerrissen, die Wagen brachen, Pferde und Ochsen fielen oder weigerten den Gehorsam.").split()
+    dat = clean("Eis Missgschick nach em andere het sie troffe: d Gschirr zerrisse, d Wage broche, Ross und Ochse gheied oder weigered de Ghorsam.").split()
 
     G = build_bipartite_graph(dit, dat, max_word_len=10, max_sent_len=5)
     matching = solve_matching(G)
