@@ -73,50 +73,64 @@ def _extract_uuid(result_text: str) -> str | None:
     return match.group(1) if match else None
 
 
-def transcribe_single(audio_path: Path, max_retries: int = 3, delay: float = 0.5) -> str:
-    """Transcribe one audio file via the FHNW Gradio API (thread-safe)."""
-    httpx_timeout = {"timeout": 60.0}  # 60s timeout for all HTTP requests
+PER_FILE_TIMEOUT = 120  # hard timeout per attempt in seconds
 
+
+def _do_one_attempt(audio_path: Path) -> str:
+    """Single upload+poll attempt (runs inside a timeout wrapper)."""
+    httpx_timeout = {"timeout": 30.0}
+
+    upload_client = Client(UPLOAD_URL, verbose=False, httpx_kwargs=httpx_timeout)
+    upload_result = upload_client.predict(
+        file_path=handle_file(str(audio_path)),
+        api_name="/handle_upload",
+    )
+    uuid = _extract_uuid(str(upload_result))
+    if not uuid:
+        return "ERROR: NO UUID"
+
+    status_client = Client(
+        STATUS_URL,
+        httpx_kwargs={"params": {"uuid": uuid}, "timeout": 30.0},
+        verbose=False,
+    )
+
+    for poll in range(60):
+        if _shutdown.is_set():
+            return "ERROR: SHUTDOWN"
+        result = status_client.predict(api_name="/check_file_status")
+        txt_path = (
+            result[4].get("value") if isinstance(result[4], dict) else result[4]
+        )
+        if txt_path is not None:
+            break
+        time.sleep(5)
+    else:
+        return "ERROR: POLL TIMEOUT"
+
+    return Path(txt_path).read_text(encoding="utf-8").strip()
+
+
+def transcribe_single(audio_path: Path, max_retries: int = 3, delay: float = 0.5) -> str:
+    """Transcribe one audio file via the FHNW Gradio API (thread-safe).
+    Each attempt has a hard timeout to prevent indefinite blocking."""
     for attempt in range(max_retries):
         if _shutdown.is_set():
             return "ERROR: SHUTDOWN"
         time.sleep(delay)
         try:
-            upload_client = Client(UPLOAD_URL, verbose=False, httpx_kwargs=httpx_timeout)
-            upload_result = upload_client.predict(
-                file_path=handle_file(str(audio_path)),
-                api_name="/handle_upload",
-            )
-            uuid = _extract_uuid(str(upload_result))
-            if not uuid:
-                if attempt < max_retries - 1:
-                    time.sleep(2 ** attempt)
-                    continue
-                return "ERROR: NO UUID"
-
-            status_client = Client(
-                STATUS_URL,
-                httpx_kwargs={"params": {"uuid": uuid}, "timeout": 60.0},
-                verbose=False,
-            )
-
-            # Poll until transcription is ready (max ~5 min per file)
-            for poll in range(60):
-                if _shutdown.is_set():
-                    return "ERROR: SHUTDOWN"
-                result = status_client.predict(api_name="/check_file_status")
-                txt_path = (
-                    result[4].get("value") if isinstance(result[4], dict) else result[4]
-                )
-                if txt_path is not None:
-                    break
-                time.sleep(5)
-            else:
-                return "ERROR: POLL TIMEOUT"
-
-            transcription = Path(txt_path).read_text(encoding="utf-8").strip()
-            return transcription
-
+            with ThreadPoolExecutor(max_workers=1) as mini_pool:
+                future = mini_pool.submit(_do_one_attempt, audio_path)
+                result = future.result(timeout=PER_FILE_TIMEOUT)
+            if result == "ERROR: NO UUID" and attempt < max_retries - 1:
+                time.sleep(2 ** attempt)
+                continue
+            return result
+        except TimeoutError:
+            if attempt < max_retries - 1:
+                time.sleep(2 ** attempt)
+                continue
+            return "ERROR: ATTEMPT TIMEOUT"
         except Exception as e:
             if attempt < max_retries - 1:
                 time.sleep(2 ** attempt)
