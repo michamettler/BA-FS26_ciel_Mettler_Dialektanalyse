@@ -132,7 +132,7 @@ def calculate_cost(
     )
 
     # Combine lexical and positional similarity into a single score using a weighted average.
-    score = calculate_score_weighted(word_similarity, position_score, alpha=0.5)
+    score = calculate_score_weighted(word_similarity, position_score, alpha=0.7)
 
     return 1 - score  # Convert similarity to cost
 
