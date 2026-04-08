@@ -9,7 +9,7 @@ from calculations import (
 )
 
 EPSILON_PENALTY = 0.6
-EPSILON_SYMBOL = "ε"
+COST_SCALE = 1000  # scale float costs to int for network_simplex
 
 
 def build_bipartite_graph(
@@ -18,43 +18,88 @@ def build_bipartite_graph(
     max_word_len: int,
     max_sent_len: int,
     alpha: float = 0.5,
-) -> nx.Graph:
-    """Build a weighted bipartite graph between source (DIT) and target (DAT) words.
-    TODO: add correct mathematical definition here.
+) -> nx.DiGraph:
+    """Build a weighted bipartite flow network between source (DIT) and target (DAT) words.
 
-    Each partition is padded with ε-nodes (one per word in the opposite partition)
-    so that both sides have (m + n) nodes, enabling a full matching that can
-    leave words unmatched (mapped to ε) at a fixed penalty cost.
+    The alignment is modelled as finding the minimum-cost flow in a bipartite
+    network G = (W' ∪ V', E) with source s and sink t.
+
+    Each partition is padded with ε-nodes so that both sides have N = m + n nodes,
+    enabling a perfect matching where unmatched words flow through ε at a fixed penalty.
 
     Edge weights represent cost = 1 - similarity (lower = better match).
-    Edges to ε-nodes carry a fixed EPSILON_PENALTY cost.
+    All edge capacities are 1 (unit flow).
     """
-    # Initialize an empty bipartite graph
-    G = nx.Graph()
+    # --- Graph ---
+    G = nx.DiGraph()
 
-    # ------
-    
-    # Node Creation: Add nodes for each source and target word, plus ε-nodes
-    
-    # Add real word nodes
+    m = len(src_words)  # |W|, source word count / amount of ε-nodes in V'
+    n = len(target_words)  # |V|, target word count / amount of ε-nodes in W'
+    N = m + n  # padded partition size
+
+    # --- Nodes ---
+    # source
+    G.add_node("s", demand=-N)
+
+    # word nodes
     for i, word in enumerate(src_words):
-        G.add_node(f"src_{i}", bipartite=0, word=word)
+        G.add_node(f"src_{i}", word=word)
     for j, word in enumerate(target_words):
-        G.add_node(f"tgt_{j}", bipartite=1, word=word)
+        G.add_node(f"tgt_{j}", word=word)
 
-    # Fill both partitions respective to amount of words in other 
-    # partition to achieve same amount of nodes on both sides.
-    for j in range(len(target_words)):
-        G.add_node(f"src_ε_{j}", bipartite=0, word=EPSILON_SYMBOL)
-    for i in range(len(src_words)):
-        G.add_node(f"tgt_ε_{i}", bipartite=1, word=EPSILON_SYMBOL)
-        
-    m = len(src_words)
-    n = len(target_words)
-    N = m + n   # N = total nodes per partition after adding ε-nodes
+    # ε-nodes
+    for j in range(n):
+        G.add_node(f"src_ε_{j}", word="ε")
+    for i in range(m):
+        G.add_node(f"tgt_ε_{i}", word="ε")
 
-    # ------
-    
+    # sink
+    G.add_node("t", demand=N)
+
+    # --- Edges ---
+    # edges from s to W'
+    for i in range(m):
+        G.add_edge("s", f"src_{i}", capacity=1, weight=0)
+    for j in range(n):
+        G.add_edge("s", f"src_ε_{j}", capacity=1, weight=0)
+
+    # edges from source word nodes to target word nodes
+    for i in range(m):
+        # edges to target word nodes
+        for j in range(n):
+            src_word = clean(src_words[i])
+            target_word = clean(target_words[j])
+            
+            cost = calculate_cost(
+                src_word=src_word,
+                src_position=i,
+                target_word=target_word,
+                target_position=j,
+                global_max_word_length=max_word_len,
+                global_max_sentence_length=max_sent_len,
+                is_levenshtein_normalization_global=True,
+            )
+            G.add_edge(f"src_{i}", f"tgt_{j}", capacity=1, weight=int(cost * COST_SCALE), score=1 - cost)
+    # edges from source word nodes to target ε-nodes
+    for i in range(m):
+        for k in range(m):
+            G.add_edge(f"src_{i}", f"tgt_ε_{k}", capacity=1, weight=int(EPSILON_PENALTY * COST_SCALE), score=1 - EPSILON_PENALTY)
+            
+    # edges from source ε-nodes to target word nodes
+    for j in range(n):
+        for k in range(n):
+            G.add_edge(f"src_ε_{j}", f"tgt_{k}", capacity=1, weight=int(EPSILON_PENALTY * COST_SCALE), score=1 - EPSILON_PENALTY)
+    # edges from source ε-nodes to target ε-nodes
+    for j in range(n):
+        for i in range(m):
+            G.add_edge(f"src_ε_{j}", f"tgt_ε_{i}", capacity=1, weight=0, score=1)
+
+    # edges from V' to t
+    for j in range(n):
+        G.add_edge(f"tgt_{j}", "t", capacity=1, weight=0)
+    for i in range(m):
+        G.add_edge(f"tgt_ε_{i}", "t", capacity=1, weight=0)
+
     return G
 
 
@@ -87,31 +132,37 @@ def calculate_cost(
     )
 
     # Combine lexical and positional similarity into a single score using a weighted average.
-    score = calculate_score_weighted(word_similarity, position_score, alpha=0.5)
+    score = calculate_score_weighted(word_similarity, position_score, alpha=0.7)
 
     return 1 - score  # Convert similarity to cost
 
 
-def solve_matching(G: nx.Graph) -> dict:
-    """Find optimal minimum-weight matching on the bipartite graph."""
-    src_nodes = {n for n, d in G.nodes(data=True) if d["bipartite"] == 0}
-    return nx.bipartite.minimum_weight_full_matching(
-        G, top_nodes=src_nodes, weight="weight"
-    )
+def solve_matching(G: nx.DiGraph) -> dict[str, str]:
+    """Find optimal minimum-cost flow on the bipartite flow network.
+    Returns a dict mapping each src node to its matched tgt node."""
+    flow_dict = nx.min_cost_flow(G, weight="weight")
+
+    # Extract matching: for each node w in W', find the matched node v in V' with flow=1
+    matching = {}
+    for w, neighbors in flow_dict.items():
+        for v, flow in neighbors.items():
+            if flow == 1 and v.startswith("tgt"):
+                matching[w] = v
+    return matching
 
 
 # ── quick test ───────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    dit = clean("ich habe das gemacht").split()
-    dat = clean("i ha das gmacht").split()
+    dit = clean("Ein Missgeschick nach dem andern traf sie: die Geschirre zerrissen, die Wagen brachen, Pferde und Ochsen fielen oder weigerten den Gehorsam.").split()
+    dat = clean("Eis Missgschick nach em andere het sie troffe: d Gschirr zerrisse, d Wage broche, Ross und Ochse gheied oder weigered de Ghorsam.").split()
 
     G = build_bipartite_graph(dit, dat, max_word_len=10, max_sent_len=5)
     matching = solve_matching(G)
 
     print("Matching:")
-    for node, match in matching.items():
-        if node.startswith("src"):
-            src_word = G.nodes[node]["word"]
-            tgt_word = G.nodes[match]["word"]
-            score = G.edges[node, match]["score"]
-            print(f"  {src_word:>12} → {tgt_word:<12}  (score: {score:.3f})")
+    for src, tgt in matching.items():
+        if src.startswith("src"):
+            src_word = G.nodes[src]["word"]
+            tgt_word = G.nodes[tgt]["word"]
+            edge_data = G.edges[src, tgt]
+            print(f"  {src_word:>12} → {tgt_word:<12}  (score: {edge_data['score']:.3f})")
