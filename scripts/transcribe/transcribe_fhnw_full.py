@@ -11,8 +11,9 @@ Features:
 
 Usage:
     python transcribe_fhnw_full.py --split test
-    python transcribe_fhnw_full.py --split train_balanced
-    python transcribe_fhnw_full.py --split test --workers 8 --checkpoint-every 100
+    python transcribe_fhnw_full.py --split train_all
+    python transcribe_fhnw_full.py --split valid
+    python transcribe_fhnw_full.py --split test --workers 4 --checkpoint-every 100
     python transcribe_fhnw_full.py --split test --resume   # explicit resume (default)
     python transcribe_fhnw_full.py --split test --restart   # discard checkpoint, start fresh
 """
@@ -50,6 +51,14 @@ SPLIT_CONFIG = {
     },
     "train_balanced": {
         "tsv": "train_balanced.tsv",
+        "clips_dir": "clips__train_valid-001",
+    },
+    "train_all": {
+        "tsv": "train_all.tsv",
+        "clips_dir": "clips__train_valid-001",
+    },
+    "valid": {
+        "tsv": "valid.tsv",
         "clips_dir": "clips__train_valid-001",
     },
 }
@@ -291,8 +300,8 @@ def main():
     parser.add_argument(
         "--workers",
         type=int,
-        default=4,
-        help="Number of concurrent API workers (default: 4)",
+        default=2,
+        help="Number of concurrent API workers (default: 2)",
     )
     parser.add_argument(
         "--checkpoint-every",
