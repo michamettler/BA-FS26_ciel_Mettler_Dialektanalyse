@@ -132,7 +132,7 @@ def calculate_cost(
     )
 
     # Combine lexical and positional similarity into a single score using a weighted average.
-    score = calculate_score_weighted(word_similarity, position_score, alpha=0.7)
+    score = calculate_score_weighted(word_similarity, position_score, alpha=1)
 
     return 1 - score  # Convert similarity to cost
 
@@ -154,7 +154,8 @@ def solve_matching(G: nx.DiGraph) -> dict[str, str]:
 # ── quick test ───────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     dit = clean("Ein Missgeschick nach dem andern traf sie: die Geschirre zerrissen, die Wagen brachen, Pferde und Ochsen fielen oder weigerten den Gehorsam.").split()
-    dat = clean("Eis Missgschick nach em andere het sie troffe: d Gschirr zerrisse, d Wage broche, Ross und Ochse gheied oder weigered de Ghorsam.").split()
+    dat = clean("Ein Missgeschick nach dem andern hat sie troffen: die Geschirre sind zerrissen, die Wagen sind brochen, Rose und Ochse sind Gehege oder Hände sich ähm Gehorsam geweigert").split()
+
 
     G = build_bipartite_graph(dit, dat, max_word_len=10, max_sent_len=5)
     matching = solve_matching(G)
