@@ -244,10 +244,14 @@ def run(split: str, workers: int, checkpoint_every: int, restart: bool):
         row = df.iloc[idx]
         audio_path = clips_dir / row["path"]
 
-        if not audio_path.exists():
-            result = "ERROR: FILE NOT FOUND"
-        else:
-            result = transcribe_single(audio_path)
+        try:
+            if not audio_path.exists():
+                result = "ERROR: FILE NOT FOUND"
+            else:
+                result = transcribe_single(audio_path)
+        except Exception as e:
+            result = f"ERROR: {e}"
+            tqdm.write(f"  [WORKER ERROR] {row['path'][:60]}: {e}")
 
         with lock:
             completed[row["path"]] = result
