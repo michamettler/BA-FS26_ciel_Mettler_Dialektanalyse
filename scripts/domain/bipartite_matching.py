@@ -27,7 +27,7 @@ def build_bipartite_graph(
     Each partition is padded with ε-nodes so that both sides have N = m + n nodes,
     enabling a perfect matching where unmatched words flow through ε at a fixed penalty.
 
-    Edge weights represent cost = 1 - similarity (lower = better match).
+    Edge weights represent cost = 1 - score (lower = better match).
     All edge capacities are 1 (unit flow).
     """
     # --- Graph ---
@@ -159,8 +159,9 @@ def calculate_cost(
 
 def solve_matching(G: nx.DiGraph) -> dict[str, str]:
     """Find optimal minimum-cost flow on the bipartite flow network.
+    Uses Network Simplex algorithm from NetworkX."
     Returns a dict mapping each src node to its matched tgt node."""
-    flow_dict = nx.min_cost_flow(G, weight="weight")
+    flow_dict = nx.min_cost_flow(G, weight="weight") # TODO hungarian as alternative
 
     # Extract matching: for each node w in W', find the matched node v in V' with flow=1
     matching = {}
