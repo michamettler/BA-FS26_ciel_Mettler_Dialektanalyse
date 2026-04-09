@@ -1,9 +1,8 @@
 import networkx as nx
-import numpy as np
 from calculations import (
     clean,
-    calculate_word_similarity_global,
     calculate_word_similarity_local,
+    calculate_word_similarity_global,
     calculate_position_score,
     calculate_score_weighted,
 )
@@ -16,8 +15,9 @@ def build_bipartite_graph(
     target_words: list[str],
     max_word_len: int,
     max_sent_len: int,
-    alpha: float = 0.5,
-    epsilon_penalty: float = 0.6,
+    is_levenshtein_normalization_global: bool,
+    alpha: float = 0.7,
+    lambda_: float = 0.3,
 ) -> nx.DiGraph:
     """Build a weighted bipartite flow network between source (DIT) and target (DAT) words.
 
@@ -77,8 +77,8 @@ def build_bipartite_graph(
                 target_position=j,
                 global_max_word_length=max_word_len,
                 global_max_sentence_length=max_sent_len,
-                is_levenshtein_normalization_global=False,
-                alpha=alpha
+                is_levenshtein_normalization_global=is_levenshtein_normalization_global,
+                alpha=alpha,
             )
             G.add_edge(
                 f"src_{i}",
@@ -94,8 +94,8 @@ def build_bipartite_graph(
                 f"src_{i}",
                 f"tgt_ε_{k}",
                 capacity=1,
-                weight=int(epsilon_penalty * COST_SCALE),
-                score=1 - epsilon_penalty,
+                weight=int(lambda_ * COST_SCALE),
+                score=1 - lambda_,
             )
 
     # edges from source ε-nodes to target word nodes
@@ -105,8 +105,8 @@ def build_bipartite_graph(
                 f"src_ε_{j}",
                 f"tgt_{k}",
                 capacity=1,
-                weight=int(epsilon_penalty * COST_SCALE),
-                score=1 - epsilon_penalty,
+                weight=int(lambda_ * COST_SCALE),
+                score=1 - lambda_,
             )
     # edges from source ε-nodes to target ε-nodes
     for j in range(n):
@@ -169,20 +169,3 @@ def solve_matching(G: nx.DiGraph) -> dict[str, str]:
             if flow == 1 and v.startswith("tgt"):
                 matching[w] = v
     return matching
-
-
-if __name__ == "__main__":
-    dit = clean("Ein Missgeschick nach dem andern traf sie: die Geschirre zerrissen, die Wagen brachen, Pferde und Ochsen fielen oder weigerten den Gehorsam.").split()
-    dat = clean("Ein Missgeschick nach dem andern hat sie troffen: die Geschirre sind zerrissen, die Wagen sind brochen, Rose und Ochse sind Gehege oder Hände sich ähm Gehorsam geweigert").split()
-
-
-    G = build_bipartite_graph(dit, dat, max_word_len=10, max_sent_len=5)
-    matching = solve_matching(G)
-
-    print("Matching:")
-    for src, tgt in matching.items():
-        if src.startswith("src"):
-            src_word = G.nodes[src]["word"]
-            tgt_word = G.nodes[tgt]["word"]
-            edge_data = G.edges[src, tgt]
-            print(f"  {src_word:>12} → {tgt_word:<12}  (score: {edge_data['score']:.3f})")
