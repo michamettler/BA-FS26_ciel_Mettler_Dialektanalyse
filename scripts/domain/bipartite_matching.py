@@ -11,8 +11,8 @@ COST_SCALE = 1000  # scale float costs to int for network_simplex
 
 
 def build_bipartite_graph(
-    src_words: list[str],
-    target_words: list[str],
+    ref_words: list[str],
+    transc_words: list[str],
     max_word_len: int,
     max_sent_len: int,
     is_levenshtein_normalization_global: bool,
@@ -33,8 +33,8 @@ def build_bipartite_graph(
     # --- Graph ---
     G = nx.DiGraph()
 
-    m = len(src_words)  # |W|, source word count / amount of ε-nodes in V'
-    n = len(target_words)  # |V|, target word count / amount of ε-nodes in W'
+    m = len(ref_words)  # |W|, reference word count / amount of ε-nodes in V'
+    n = len(transc_words)  # |V|, transcribed word count / amount of ε-nodes in W'
     N = m + n  # padded partition size
 
     # --- Nodes ---
@@ -42,16 +42,16 @@ def build_bipartite_graph(
     G.add_node("s", demand=-N)
 
     # word nodes
-    for i, word in enumerate(src_words):
-        G.add_node(f"src_{i}", word=word)
-    for j, word in enumerate(target_words):
-        G.add_node(f"tgt_{j}", word=word)
+    for i, word in enumerate(ref_words):
+        G.add_node(f"ref_{i}", word=word)
+    for j, word in enumerate(transc_words):
+        G.add_node(f"transc_{j}", word=word)
 
     # ε-nodes
     for j in range(n):
-        G.add_node(f"src_ε_{j}", word="ε")
+        G.add_node(f"ref_ε_{j}", word="ε")
     for i in range(m):
-        G.add_node(f"tgt_ε_{i}", word="ε")
+        G.add_node(f"transc_ε_{i}", word="ε")
 
     # sink
     G.add_node("t", demand=N)
@@ -59,40 +59,40 @@ def build_bipartite_graph(
     # --- Edges ---
     # edges from s to W'
     for i in range(m):
-        G.add_edge("s", f"src_{i}", capacity=1, weight=0)
+        G.add_edge("s", f"ref_{i}", capacity=1, weight=0)
     for j in range(n):
-        G.add_edge("s", f"src_ε_{j}", capacity=1, weight=0)
+        G.add_edge("s", f"ref_ε_{j}", capacity=1, weight=0)
 
     # edges from source word nodes to target word nodes
     for i in range(m):
         # edges to target word nodes
         for j in range(n):
-            src_word = clean(src_words[i])
-            target_word = clean(target_words[j])
+            ref_word = clean(ref_words[i])
+            transc_word = clean(transc_words[j])
 
             cost = calculate_cost(
-                src_word=src_word,
+                src_word=ref_word,
                 src_position=i,
-                target_word=target_word,
+                target_word=transc_word,
                 target_position=j,
                 global_max_word_length=max_word_len,
                 global_max_sentence_length=max_sent_len,
-                is_levenshtein_normalization_global=is_levenshtein_normalization_global,
+                use_gloabal_levenshtein_normalization=is_levenshtein_normalization_global, # TODO rename
                 alpha=alpha,
             )
             G.add_edge(
-                f"src_{i}",
-                f"tgt_{j}",
+                f"ref_{i}",
+                f"transc_{j}",
                 capacity=1,
-                weight=int(cost * COST_SCALE),
+                weight=int(cost * COST_SCALE), # TODO belongs to calculations (maybe use ints from lev distance & pos gap)
                 score=1 - cost,
             )
     # edges from source word nodes to target ε-nodes
     for i in range(m):
         for k in range(m):
             G.add_edge(
-                f"src_{i}",
-                f"tgt_ε_{k}",
+                f"ref_{i}",
+                f"transc_ε_{k}",
                 capacity=1,
                 weight=int(lambda_ * COST_SCALE),
                 score=1 - lambda_,
@@ -102,8 +102,8 @@ def build_bipartite_graph(
     for j in range(n):
         for k in range(n):
             G.add_edge(
-                f"src_ε_{j}",
-                f"tgt_{k}",
+                f"ref_ε_{j}",
+                f"transc_{k}",
                 capacity=1,
                 weight=int(lambda_ * COST_SCALE),
                 score=1 - lambda_,
@@ -111,29 +111,29 @@ def build_bipartite_graph(
     # edges from source ε-nodes to target ε-nodes
     for j in range(n):
         for i in range(m):
-            G.add_edge(f"src_ε_{j}", f"tgt_ε_{i}", capacity=1, weight=0, score=1)
+            G.add_edge(f"ref_ε_{j}", f"transc_ε_{i}", capacity=1, weight=0, score=1)
 
     # edges from V' to t
     for j in range(n):
-        G.add_edge(f"tgt_{j}", "t", capacity=1, weight=0)
+        G.add_edge(f"transc_{j}", "t", capacity=1, weight=0)
     for i in range(m):
-        G.add_edge(f"tgt_ε_{i}", "t", capacity=1, weight=0)
+        G.add_edge(f"transc_ε_{i}", "t", capacity=1, weight=0)
 
     return G
 
 
-def calculate_cost(
+def calculate_cost( # TODO move to calculations, costs over the whole sentence also possible, also rename
     src_word: str,
     src_position: int,
     target_word: str,
     target_position: int,
     global_max_word_length: int,
     global_max_sentence_length: int,
-    is_levenshtein_normalization_global: bool,
+    use_gloabal_levenshtein_normalization: bool, # logic shouldnt be here, maybe object for params
     alpha: float = 0.5,
 ) -> float:
-    # Calculate word similarity (lexical similarity) using Levenshtein distance, normalized either globally or locally.
-    if is_levenshtein_normalization_global:
+    # Calculate word similarity (lexical similarity) using Levenshtein distance, normalized either globally or locally. TODO also levels?
+    if use_gloabal_levenshtein_normalization:
         word_similarity = calculate_word_similarity_global(
             src_word=src_word,
             target_word=target_word,
@@ -145,7 +145,7 @@ def calculate_cost(
         )
 
     # Calculate position similarity (positional similarity) based on distance in sentence, normalized by global max sentence length.
-    position_score = calculate_position_score(
+    position_score = calculate_position_score( # TODO maybe in levels (based on neighbourhood)
         src_index=src_position,
         target_index=target_position,
         global_max_sentence_length=global_max_sentence_length,
@@ -167,6 +167,6 @@ def solve_matching(G: nx.DiGraph) -> dict[str, str]:
     matching = {}
     for w, neighbors in flow_dict.items():
         for v, flow in neighbors.items():
-            if flow == 1 and v.startswith("tgt"):
+            if flow == 1 and v.startswith("transc"):
                 matching[w] = v
     return matching
