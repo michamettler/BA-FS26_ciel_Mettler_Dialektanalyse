@@ -12,17 +12,17 @@ COST_SCALE = 1000  # scale float costs to int for network_simplex
 
 def build_bipartite_graph(
     ref_words: list[str],
-    transc_words: list[str],
+    hyp_words: list[str],
     max_word_len: int,
     max_sent_len: int,
     is_levenshtein_normalization_global: bool,
     alpha: float = 0.7,
     lambda_: float = 0.3,
 ) -> nx.DiGraph:
-    """Build a weighted bipartite flow network between source (DIT) and target (DAT) words.
+    """Build a weighted bipartite flow network between reference and hypothesis words.
 
     The alignment is modelled as finding the minimum-cost flow in a bipartite
-    network G = (W' ∪ V', E) with source s and sink t.
+    network G = (R' ∪ H', E) with source s and sink t.
 
     Each partition is padded with ε-nodes so that both sides have N = m + n nodes,
     enabling a perfect matching where unmatched words flow through ε at a fixed penalty.
@@ -33,8 +33,8 @@ def build_bipartite_graph(
     # --- Graph ---
     G = nx.DiGraph()
 
-    m = len(ref_words)  # |W|, reference word count / amount of ε-nodes in V'
-    n = len(transc_words)  # |V|, transcribed word count / amount of ε-nodes in W'
+    m = len(ref_words)  # |R|, reference word count / amount of ε-nodes in H'
+    n = len(hyp_words)  # |H|, hypothesis word count / amount of ε-nodes in R'
     N = m + n  # padded partition size
 
     # --- Nodes ---
@@ -44,14 +44,14 @@ def build_bipartite_graph(
     # word nodes
     for i, word in enumerate(ref_words):
         G.add_node(f"ref_{i}", word=word)
-    for j, word in enumerate(transc_words):
-        G.add_node(f"transc_{j}", word=word)
+    for j, word in enumerate(hyp_words):
+        G.add_node(f"hyp_{j}", word=word)
 
     # ε-nodes
     for j in range(n):
         G.add_node(f"ref_ε_{j}", word="ε")
     for i in range(m):
-        G.add_node(f"transc_ε_{i}", word="ε")
+        G.add_node(f"hyp_ε_{i}", word="ε")
 
     # sink
     G.add_node("t", demand=N)
@@ -63,17 +63,16 @@ def build_bipartite_graph(
     for j in range(n):
         G.add_edge("s", f"ref_ε_{j}", capacity=1, weight=0)
 
-    # edges from source word nodes to target word nodes
+    # edges from ref word nodes to hyp word nodes
     for i in range(m):
-        # edges to target word nodes
         for j in range(n):
             ref_word = clean(ref_words[i])
-            transc_word = clean(transc_words[j])
+            hyp_word = clean(hyp_words[j])
 
             cost = calculate_cost(
                 src_word=ref_word,
                 src_position=i,
-                target_word=transc_word,
+                target_word=hyp_word,
                 target_position=j,
                 global_max_word_length=max_word_len,
                 global_max_sentence_length=max_sent_len,
@@ -82,42 +81,42 @@ def build_bipartite_graph(
             )
             G.add_edge(
                 f"ref_{i}",
-                f"transc_{j}",
+                f"hyp_{j}",
                 capacity=1,
                 weight=int(cost * COST_SCALE), # TODO belongs to calculations (maybe use ints from lev distance & pos gap)
                 score=1 - cost,
             )
-    # edges from source word nodes to target ε-nodes
+    # edges from ref word nodes to hyp ε-nodes
     for i in range(m):
         for k in range(m):
             G.add_edge(
                 f"ref_{i}",
-                f"transc_ε_{k}",
+                f"hyp_ε_{k}",
                 capacity=1,
                 weight=int(lambda_ * COST_SCALE),
                 score=1 - lambda_,
             )
 
-    # edges from source ε-nodes to target word nodes
+    # edges from ref ε-nodes to hyp word nodes
     for j in range(n):
         for k in range(n):
             G.add_edge(
                 f"ref_ε_{j}",
-                f"transc_{k}",
+                f"hyp_{k}",
                 capacity=1,
                 weight=int(lambda_ * COST_SCALE),
                 score=1 - lambda_,
             )
-    # edges from source ε-nodes to target ε-nodes
+    # edges from ref ε-nodes to hyp ε-nodes
     for j in range(n):
         for i in range(m):
-            G.add_edge(f"ref_ε_{j}", f"transc_ε_{i}", capacity=1, weight=0, score=1)
+            G.add_edge(f"ref_ε_{j}", f"hyp_ε_{i}", capacity=1, weight=0, score=1)
 
-    # edges from V' to t
+    # edges from H' to t
     for j in range(n):
-        G.add_edge(f"transc_{j}", "t", capacity=1, weight=0)
+        G.add_edge(f"hyp_{j}", "t", capacity=1, weight=0)
     for i in range(m):
-        G.add_edge(f"transc_ε_{i}", "t", capacity=1, weight=0)
+        G.add_edge(f"hyp_ε_{i}", "t", capacity=1, weight=0)
 
     return G
 
@@ -167,6 +166,6 @@ def solve_matching(G: nx.DiGraph) -> dict[str, str]:
     matching = {}
     for w, neighbors in flow_dict.items():
         for v, flow in neighbors.items():
-            if flow == 1 and v.startswith("transc"):
+            if flow == 1 and v.startswith("hyp"):
                 matching[w] = v
     return matching

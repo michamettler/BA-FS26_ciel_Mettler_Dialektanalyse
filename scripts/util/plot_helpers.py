@@ -47,7 +47,7 @@ def plot_bipartite_matching(
 
     for s_node, t_node in matching.items():
         s_is_eps = s_node.startswith("ref_ε")
-        t_is_eps = t_node.startswith("transc_ε")
+        t_is_eps = t_node.startswith("hyp_ε")
         if s_is_eps and t_is_eps:
             continue
         if s_is_eps:
@@ -121,8 +121,8 @@ def plot_bipartite_matching(
 
     # headers & colorbar
     header_y = total_rows - 1 + 0.8
-    ax.text(x_left - 0.02, header_y, "Source", fontsize=12, ha="right", va="center", fontstyle="italic", color="#888")
-    ax.text(x_right + 0.02, header_y, "DIT", fontsize=12, ha="left", va="center", fontstyle="italic", color="#888")
+    ax.text(x_left - 0.02, header_y, "Reference", fontsize=12, ha="right", va="center", fontstyle="italic", color="#888")
+    ax.text(x_right + 0.02, header_y, "Hypothesis", fontsize=12, ha="left", va="center", fontstyle="italic", color="#888")
 
     sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(0, 1))
     sm.set_array([])
@@ -131,6 +131,6 @@ def plot_bipartite_matching(
     ax.set_xlim(-0.35, 1.35)
     ax.set_ylim(-0.8, total_rows + 0.5)
     ax.axis("off")
-    ax.set_title("Bipartite Matching: Source → DIT", fontsize=14, pad=15)
+    ax.set_title("Bipartite Matching: Reference → Hypothesis", fontsize=14, pad=15)
     plt.tight_layout()
     plt.show()
