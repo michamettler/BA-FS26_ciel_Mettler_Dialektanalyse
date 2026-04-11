@@ -7,7 +7,7 @@ from calculations import (
     calculate_score_weighted,
 )
 
-COST_SCALE = 1000  # scale float costs to int for network_simplex
+COST_SCALE = 1000  # scale float costs to int for network_simplex TODO remove
 
 
 def build_bipartite_graph(
