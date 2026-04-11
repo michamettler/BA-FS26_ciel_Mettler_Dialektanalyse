@@ -11,10 +11,10 @@ def _sort_key(node_name: str) -> tuple[int, int]:
     Sort key for bipartite graph nodes: real words first, then epsilon; each group sorted by index.
 
     Args:
-        node_name: Node name like "ref_3" or "hyp_ε_2".
+    - node_name: Node name like "ref_3" or "hyp_ε_2".
     Returns: A tuple (is_eps, idx), where
-        is_eps: 0 for real words and 1 for epsilon (so real words come first).
-        idx: extracted index for sorting inside words/epsilons (e.g., "ref_3" -> 3, "hyp_ε_2" -> 2).
+    - is_eps: 0 for real words and 1 for epsilon (so real words come first).
+    - idx: extracted index for sorting inside words/epsilons (e.g., "ref_3" -> 3, "hyp_ε_2" -> 2).
     """
     is_eps = 1 if "ε" in node_name else 0
     idx = int(node_name.split("_")[-1])  # extract index from node name (last segment)
@@ -26,12 +26,11 @@ def _build_layout(ref_nodes: list[str], hyp_nodes: list[str]) -> tuple[dict, int
     Compute 4-column layout: source (s), reference nodes (ref), hypothesis nodes (hyp) and sink (t).
 
     Args:
-        ref_nodes: List of reference node names.
-        hyp_nodes: List of hypothesis node names.
+    - ref_nodes: List of reference node names.
+    - hyp_nodes: List of hypothesis node names.
     Returns: A tuple (pos, N), where
-        pos: Dict mapping:
-            node name -> (column, row) position.
-        N: Row count (max of ref and hyp side).
+    - pos: Dict mapping: node name -> (column, row) position.
+    - N: Row count (max of ref and hyp side).
     """
     N = max(len(ref_nodes), len(hyp_nodes))
     y_center = (N - 1) / 2
@@ -55,8 +54,8 @@ def plot_bipartite_graph(
     The reduced graph doesn't include epsilon-to-epsilon matchings to reduce complexity.
 
     Args:
-        G: Full flow network.
-        matching: Dict mapping of reference and hypothesis partitions.
+    - G: Full flow network.
+    - matching: Dict mapping of reference and hypothesis partitions.
     """
     # color map to visualize scores
     cmap = mcolors.LinearSegmentedColormap.from_list("rg", ["#e74c3c", "#f0c929", "#2ecc71"])
@@ -174,7 +173,7 @@ def plot_bipartite_graph_full(
     Shows the complete graph structure: s → R' (all edges) → H' (all edges) → t, including all possible connections.
 
     Args:
-        G: Full flow network.
+    - G: Full flow network.
     """
     # --- collect nodes by side/partition ---
     ref_nodes: list[str] = [str(node) for node, attrs in G.nodes(data=True) if attrs.get("side") == "ref"]
@@ -243,8 +242,8 @@ def plot_score_distribution(data, title):
     Helper function to plot a histogram of scores with mean value indicated by a dashed line.
 
     Args:
-        data (_type_): _description_
-        title (_type_): _description_
+    - data (_type_): _description_
+    - title (_type_): _description_
     """
     fig, ax = plt.subplots(figsize=(6, 4))
     ax.hist(data.dropna(), bins=50, color="#4C72B0", edgecolor="white", linewidth=0.4)

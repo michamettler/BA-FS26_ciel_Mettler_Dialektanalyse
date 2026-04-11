@@ -11,24 +11,34 @@ COST_SCALE = 1000  # scale float costs to int for network_simplex
 
 
 def build_bipartite_graph(
-    ref_words: list[str],
-    hyp_words: list[str],
-    max_word_len: int,
-    max_sent_len: int,
-    is_levenshtein_normalization_global: bool,
-    alpha: float = 0.7,
-    lambda_: float = 0.3,
+        ref_words: list[str],
+        hyp_words: list[str],
+        max_word_len: int,
+        max_sent_len: int,
+        is_levenshtein_normalization_global: bool,
+        alpha: float = 0.7,
+        lambda_: float = 0.3,
 ) -> nx.DiGraph:
-    """Build a weighted bipartite flow network between reference and hypothesis words.
+    """_summary
+    Build a weighted bipartite flow network between reference and hypothesis words.
 
-    The alignment is modelled as finding the minimum-cost flow in a bipartite
-    network G = (R' ∪ H', E) with source s and sink t.
-
+    The alignment is modeled as finding the min-cost max-flow in a bipartite network
+    G = (R' ∪ H', E) with source s and sink t.
     Each partition is padded with ε-nodes so that both sides have N = n_r + n_h nodes,
     enabling a perfect matching where unmatched words flow through ε at a fixed penalty.
-
-    Edge weights represent cost = 1 - score (lower = better match).
+    Edge weights represent cost = 1 - score (lower cost = better match).
     All edge capacities are 1 (unit flow).
+
+    Args:
+    - ref_words: list of words in the reference sentence
+    - hyp_words: list of words in the hypothesis sentence
+    - max_word_len: global max word length for normalizing Levenshtein distance (if global normalization is used)
+    - max_sent_len: global max sentence length for normalizing position score
+    - is_levenshtein_normalization_global: whether to use global or local normalization for Levenshtein distance when calculating word similarity
+    - alpha: weight for combining lexical and positional similarity into a single score (default 0.7 means 70% lexical, 30% positional)
+    - lambda_: penalty cost for unmatched words (flow through ε-nodes), in [0, 1] (default 0.3 means 30% penalty)
+    Returns:
+    - G: a NetworkX directed graph representing the bipartite flow network with nodes and edges as described above.
     """
     # --- Graph ---
     G = nx.DiGraph()
@@ -76,14 +86,15 @@ def build_bipartite_graph(
                 target_position=j,
                 global_max_word_length=max_word_len,
                 global_max_sentence_length=max_sent_len,
-                use_gloabal_levenshtein_normalization=is_levenshtein_normalization_global, # TODO rename
+                use_gloabal_levenshtein_normalization=is_levenshtein_normalization_global,  # TODO rename
                 alpha=alpha,
             )
             G.add_edge(
                 f"ref_{i}",
                 f"hyp_{j}",
                 capacity=1,
-                weight=int(cost * COST_SCALE), # TODO belongs to calculations (maybe use ints from lev distance & pos gap)
+                weight=int(cost * COST_SCALE),
+                # TODO belongs to calculations (maybe use ints from lev distance & pos gap)
                 score=1 - cost,
             )
     # edges from ref word nodes to hyp ε-nodes
@@ -121,15 +132,15 @@ def build_bipartite_graph(
     return G
 
 
-def calculate_cost( # TODO move to calculations, costs over the whole sentence also possible, also rename
-    src_word: str,
-    src_position: int,
-    target_word: str,
-    target_position: int,
-    global_max_word_length: int,
-    global_max_sentence_length: int,
-    use_gloabal_levenshtein_normalization: bool, # logic shouldnt be here, maybe object for params
-    alpha: float = 0.5,
+def calculate_cost(  # TODO move to calculations, costs over the whole sentence also possible, also rename
+        src_word: str,
+        src_position: int,
+        target_word: str,
+        target_position: int,
+        global_max_word_length: int,
+        global_max_sentence_length: int,
+        use_gloabal_levenshtein_normalization: bool,  # logic shouldnt be here, maybe object for params
+        alpha: float = 0.5,
 ) -> float:
     # Calculate word similarity (lexical similarity) using Levenshtein distance, normalized either globally or locally. TODO also levels?
     if use_gloabal_levenshtein_normalization:
@@ -144,7 +155,7 @@ def calculate_cost( # TODO move to calculations, costs over the whole sentence a
         )
 
     # Calculate position similarity (positional similarity) based on distance in sentence, normalized by global max sentence length.
-    position_score = calculate_position_score( # TODO maybe in levels (based on neighbourhood)
+    position_score = calculate_position_score(  # TODO maybe in levels (based on neighbourhood)
         src_index=src_position,
         target_index=target_position,
         global_max_sentence_length=global_max_sentence_length,
@@ -157,10 +168,10 @@ def calculate_cost( # TODO move to calculations, costs over the whole sentence a
 
 
 def solve_matching(G: nx.DiGraph) -> dict[str, str]:
-    """Find optimal minimum-cost flow on the bipartite flow network.
+    """Find the optimal minimum-cost flow on the bipartite flow network.
     Uses Network Simplex algorithm from NetworkX."
     Returns a dict mapping each src node to its matched tgt node."""
-    flow_dict = nx.min_cost_flow(G, weight="weight") # TODO hungarian as alternative
+    flow_dict = nx.min_cost_flow(G, weight="weight")  # TODO hungarian as alternative
 
     # Extract matching: for each node w in W', find the matched node v in V' with flow=1
     matching = {}
