@@ -39,22 +39,22 @@ def build_bipartite_graph(
 
     # --- Nodes ---
     # source
-    G.add_node("s", demand=-N)
+    G.add_node("s", demand=-N, side="source")
 
     # word nodes
     for i, word in enumerate(ref_words):
-        G.add_node(f"ref_{i}", word=word)
+        G.add_node(f"ref_{i}", word=word, side="ref")
     for j, word in enumerate(hyp_words):
-        G.add_node(f"hyp_{j}", word=word)
+        G.add_node(f"hyp_{j}", word=word, side="hyp")
 
     # ε-nodes
     for j in range(n_h):
-        G.add_node(f"ref_ε_{j}", word="ε")
+        G.add_node(f"ref_ε_{j}", word="ε", side="ref")
     for i in range(n_r):
-        G.add_node(f"hyp_ε_{i}", word="ε")
+        G.add_node(f"hyp_ε_{i}", word="ε", side="hyp")
 
     # sink
-    G.add_node("t", demand=N)
+    G.add_node("t", demand=N, side="sink")
 
     # --- Edges ---
     # edges from s to R'
@@ -166,6 +166,6 @@ def solve_matching(G: nx.DiGraph) -> dict[str, str]:
     matching = {}
     for w, neighbors in flow_dict.items():
         for v, flow in neighbors.items():
-            if flow == 1 and v.startswith("hyp"):
+            if flow == 1 and G.nodes[v].get("side") == "hyp":
                 matching[w] = v
     return matching
