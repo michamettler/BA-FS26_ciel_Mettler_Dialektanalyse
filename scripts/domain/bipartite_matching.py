@@ -24,7 +24,7 @@ def build_bipartite_graph(
     The alignment is modelled as finding the minimum-cost flow in a bipartite
     network G = (R' ∪ H', E) with source s and sink t.
 
-    Each partition is padded with ε-nodes so that both sides have N = m + n nodes,
+    Each partition is padded with ε-nodes so that both sides have N = n_r + n_h nodes,
     enabling a perfect matching where unmatched words flow through ε at a fixed penalty.
 
     Edge weights represent cost = 1 - score (lower = better match).
@@ -33,9 +33,9 @@ def build_bipartite_graph(
     # --- Graph ---
     G = nx.DiGraph()
 
-    m = len(ref_words)  # |R|, reference word count / amount of ε-nodes in H'
-    n = len(hyp_words)  # |H|, hypothesis word count / amount of ε-nodes in R'
-    N = m + n  # padded partition size
+    n_r = len(ref_words)  # |R|, reference word count / amount of ε-nodes in H'
+    n_h = len(hyp_words)  # |H|, hypothesis word count / amount of ε-nodes in R'
+    N = n_r + n_h  # padded partition size
 
     # --- Nodes ---
     # source
@@ -48,24 +48,24 @@ def build_bipartite_graph(
         G.add_node(f"hyp_{j}", word=word)
 
     # ε-nodes
-    for j in range(n):
+    for j in range(n_h):
         G.add_node(f"ref_ε_{j}", word="ε")
-    for i in range(m):
+    for i in range(n_r):
         G.add_node(f"hyp_ε_{i}", word="ε")
 
     # sink
     G.add_node("t", demand=N)
 
     # --- Edges ---
-    # edges from s to W'
-    for i in range(m):
+    # edges from s to R'
+    for i in range(n_r):
         G.add_edge("s", f"ref_{i}", capacity=1, weight=0)
-    for j in range(n):
+    for j in range(n_h):
         G.add_edge("s", f"ref_ε_{j}", capacity=1, weight=0)
 
     # edges from ref word nodes to hyp word nodes
-    for i in range(m):
-        for j in range(n):
+    for i in range(n_r):
+        for j in range(n_h):
             ref_word = clean(ref_words[i])
             hyp_word = clean(hyp_words[j])
 
@@ -87,8 +87,8 @@ def build_bipartite_graph(
                 score=1 - cost,
             )
     # edges from ref word nodes to hyp ε-nodes
-    for i in range(m):
-        for k in range(m):
+    for i in range(n_r):
+        for k in range(n_r):
             G.add_edge(
                 f"ref_{i}",
                 f"hyp_ε_{k}",
@@ -98,8 +98,8 @@ def build_bipartite_graph(
             )
 
     # edges from ref ε-nodes to hyp word nodes
-    for j in range(n):
-        for k in range(n):
+    for j in range(n_h):
+        for k in range(n_h):
             G.add_edge(
                 f"ref_ε_{j}",
                 f"hyp_{k}",
@@ -108,14 +108,14 @@ def build_bipartite_graph(
                 score=1 - lambda_,
             )
     # edges from ref ε-nodes to hyp ε-nodes
-    for j in range(n):
-        for i in range(m):
+    for j in range(n_h):
+        for i in range(n_r):
             G.add_edge(f"ref_ε_{j}", f"hyp_ε_{i}", capacity=1, weight=0, score=1)
 
     # edges from H' to t
-    for j in range(n):
+    for j in range(n_h):
         G.add_edge(f"hyp_{j}", "t", capacity=1, weight=0)
-    for i in range(m):
+    for i in range(n_r):
         G.add_edge(f"hyp_ε_{i}", "t", capacity=1, weight=0)
 
     return G
