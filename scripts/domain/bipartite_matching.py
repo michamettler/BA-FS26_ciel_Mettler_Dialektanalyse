@@ -1,5 +1,6 @@
 import networkx as nx
 from calculations import calculate_cost_for_word_pair_by_lexical_and_positional_score
+from models import CalculationParameters
 from preprocessing import clean_word
 
 EPS = "ε"  # epsilon symbol, used for unmatched padding nodes
@@ -21,11 +22,7 @@ _COST_SCALE = 1000
 def build_bipartite_graph(
         ref_words: list[str],
         hyp_words: list[str],
-        max_word_len: int,
-        max_sent_len: int,
-        use_global_levenshtein_normalization: bool,
-        alpha: float = 0.7,
-        lambda_: float = 0.3,
+        calculation_parameters: CalculationParameters,
 ) -> nx.DiGraph:
     """Build a weighted bipartite flow network between reference and hypothesis words.
 
@@ -39,15 +36,13 @@ def build_bipartite_graph(
     Args:
         ref_words: List of words in the reference sentence.
         hyp_words: List of words in the hypothesis sentence.
-        max_word_len: Global max word length for normalizing Levenshtein distance (if global normalization is used).
-        max_sent_len: Global max sentence length for normalizing position score.
-        use_global_levenshtein_normalization: Whether to use global or local normalization for Levenshtein distance when calculating word similarity.
-        alpha: Weight for combining lexical and positional similarity into a single score (default 0.7 means 70% lexical, 30% positional).
-        lambda_: Penalty cost for unmatched words (flow through ε-nodes), in [0, 1] (default 0.3 means 30% penalty).
+        calculation_parameters: Matching configuration (alpha, lambda_, normalization mode, max lengths).
 
     Returns:
         A NetworkX directed graph representing the bipartite flow network with nodes and edges as described above.
     """
+    assert calculation_parameters is not None
+
     # --- Graph ---
     G = nx.DiGraph()
 
@@ -92,10 +87,7 @@ def build_bipartite_graph(
                 src_position=i,
                 target_word=hyp_word,
                 target_position=j,
-                global_max_word_length=max_word_len,
-                global_max_sentence_length=max_sent_len,
-                use_global_levenshtein_normalization=use_global_levenshtein_normalization,
-                alpha=alpha,
+                calculation_parameters=calculation_parameters,
             )
             G.add_edge(
                 _get_node_name(REFERENCE_PARTITION, i),
@@ -111,8 +103,8 @@ def build_bipartite_graph(
                 _get_node_name(REFERENCE_PARTITION, i),
                 _get_node_name(HYPOTHESIS_PARTITION, k, eps=True),
                 capacity=1,
-                weight=int(lambda_ * _COST_SCALE),
-                score=1 - lambda_,
+                weight=int(calculation_parameters.lambda_ * _COST_SCALE),
+                score=1 - calculation_parameters.lambda_,
             )
 
     # edges from ref ε-nodes to hyp word nodes
@@ -122,8 +114,8 @@ def build_bipartite_graph(
                 _get_node_name(REFERENCE_PARTITION, j, eps=True),
                 _get_node_name(HYPOTHESIS_PARTITION, k),
                 capacity=1,
-                weight=int(lambda_ * _COST_SCALE),
-                score=1 - lambda_,
+                weight=int(calculation_parameters.lambda_ * _COST_SCALE),
+                score=1 - calculation_parameters.lambda_,
             )
     # edges from ref ε-nodes to hyp ε-nodes
     for j in range(n_h):
