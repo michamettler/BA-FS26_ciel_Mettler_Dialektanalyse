@@ -9,6 +9,18 @@ from calculations import (
 
 COST_SCALE = 1000  # scale float costs to int for network_simplex TODO remove
 
+EPS = "ε"  # epsilon symbol, used for unmatched padding nodes
+SOURCE_NODE = "s"
+SINK_NODE = "t"
+REFERENCE_PARTITION = "ref"
+HYPOTHESIS_PARTITION = "hyp"
+
+# Node/edge attribute keys
+ATTR_WORD = "word"
+ATTR_PARTITION = "partition"
+ATTR_LABEL = "label"
+ATTR_SCORE = "score"
+
 
 def build_bipartite_graph(
         ref_words: list[str],
@@ -43,35 +55,35 @@ def build_bipartite_graph(
     # --- Graph ---
     G = nx.DiGraph()
 
-    n_r = len(ref_words)  # |R|, reference word count / amount of ε-nodes in H'
-    n_h = len(hyp_words)  # |H|, hypothesis word count / amount of ε-nodes in R'
+    n_r = len(ref_words)  # |R|, reference word count / number of ε-nodes in H'
+    n_h = len(hyp_words)  # |H|, hypothesis word count / number of ε-nodes in R'
     N = n_r + n_h  # padded partition size
 
     # --- Nodes ---
     # source
-    G.add_node("s", demand=-N, side="source")
+    G.add_node(SOURCE_NODE, demand=-N)
 
     # word nodes
     for i, word in enumerate(ref_words):
-        G.add_node(f"ref_{i}", word=word, side="ref")
+        G.add_node(_get_node_name(REFERENCE_PARTITION, i), word=word, partition=REFERENCE_PARTITION)
     for j, word in enumerate(hyp_words):
-        G.add_node(f"hyp_{j}", word=word, side="hyp")
+        G.add_node(_get_node_name(HYPOTHESIS_PARTITION, j), word=word, partition=HYPOTHESIS_PARTITION)
 
-    # ε-nodes
-    for j in range(n_h):
-        G.add_node(f"ref_ε_{j}", word="ε", side="ref")
+    # epsilon-nodes
     for i in range(n_r):
-        G.add_node(f"hyp_ε_{i}", word="ε", side="hyp")
+        G.add_node(_get_node_name(HYPOTHESIS_PARTITION, i, eps=True), word=EPS, partition=HYPOTHESIS_PARTITION)
+    for j in range(n_h):
+        G.add_node(_get_node_name(REFERENCE_PARTITION, j, eps=True), word=EPS, partition=REFERENCE_PARTITION)
 
     # sink
-    G.add_node("t", demand=N, side="sink")
+    G.add_node(SINK_NODE, demand=N)
 
     # --- Edges ---
     # edges from s to R'
     for i in range(n_r):
-        G.add_edge("s", f"ref_{i}", capacity=1, weight=0)
+        G.add_edge(SOURCE_NODE, _get_node_name(REFERENCE_PARTITION, i), capacity=1, weight=0)
     for j in range(n_h):
-        G.add_edge("s", f"ref_ε_{j}", capacity=1, weight=0)
+        G.add_edge(SOURCE_NODE, _get_node_name(REFERENCE_PARTITION, j, eps=True), capacity=1, weight=0)
 
     # edges from ref word nodes to hyp word nodes
     for i in range(n_r):
@@ -90,8 +102,8 @@ def build_bipartite_graph(
                 alpha=alpha,
             )
             G.add_edge(
-                f"ref_{i}",
-                f"hyp_{j}",
+                _get_node_name(REFERENCE_PARTITION, i),
+                _get_node_name(HYPOTHESIS_PARTITION, j),
                 capacity=1,
                 weight=int(cost * COST_SCALE),
                 # TODO belongs to calculations (maybe use ints from lev distance & pos gap)
@@ -101,8 +113,8 @@ def build_bipartite_graph(
     for i in range(n_r):
         for k in range(n_r):
             G.add_edge(
-                f"ref_{i}",
-                f"hyp_ε_{k}",
+                _get_node_name(REFERENCE_PARTITION, i),
+                _get_node_name(HYPOTHESIS_PARTITION, k, eps=True),
                 capacity=1,
                 weight=int(lambda_ * COST_SCALE),
                 score=1 - lambda_,
@@ -112,8 +124,8 @@ def build_bipartite_graph(
     for j in range(n_h):
         for k in range(n_h):
             G.add_edge(
-                f"ref_ε_{j}",
-                f"hyp_{k}",
+                _get_node_name(REFERENCE_PARTITION, j, eps=True),
+                _get_node_name(HYPOTHESIS_PARTITION, k),
                 capacity=1,
                 weight=int(lambda_ * COST_SCALE),
                 score=1 - lambda_,
@@ -121,13 +133,15 @@ def build_bipartite_graph(
     # edges from ref ε-nodes to hyp ε-nodes
     for j in range(n_h):
         for i in range(n_r):
-            G.add_edge(f"ref_ε_{j}", f"hyp_ε_{i}", capacity=1, weight=0, score=1)
+            G.add_edge(_get_node_name(REFERENCE_PARTITION, j, eps=True),
+                       _get_node_name(HYPOTHESIS_PARTITION, i, eps=True),
+                       capacity=1, weight=0, score=1)
 
     # edges from H' to t
-    for j in range(n_h):
-        G.add_edge(f"hyp_{j}", "t", capacity=1, weight=0)
     for i in range(n_r):
-        G.add_edge(f"hyp_ε_{i}", "t", capacity=1, weight=0)
+        G.add_edge(_get_node_name(HYPOTHESIS_PARTITION, i, eps=True), SINK_NODE, capacity=1, weight=0)
+    for j in range(n_h):
+        G.add_edge(_get_node_name(HYPOTHESIS_PARTITION, j), SINK_NODE, capacity=1, weight=0)
 
     return G
 
@@ -199,6 +213,22 @@ def solve_matching(G: nx.DiGraph) -> dict[str, str]:
     matching = {}
     for w, neighbors in flow_dict.items():
         for v, flow in neighbors.items():
-            if flow == 1 and G.nodes[v].get("side") == "hyp":
+            if flow == 1 and G.nodes[v].get(ATTR_PARTITION) == HYPOTHESIS_PARTITION:
                 matching[w] = v
     return matching
+
+
+def _get_node_name(partition: str, index: int, eps: bool = False) -> str:
+    """Build a node name from partition, index, and optional epsilon flag.
+
+    Args:
+        partition: The partition identifier (REFERENCE_PARTITION or HYPOTHESIS_PARTITION).
+        index: The numerical index of the node.
+        eps: Whether the node is an epsilon (padding) node.
+
+    Returns:
+        A node name string, e.g. "ref_0" or "hyp_ε_2".
+    """
+    if eps:
+        return f"{partition}_{EPS}_{index}"
+    return f"{partition}_{index}"
