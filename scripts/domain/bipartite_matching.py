@@ -19,8 +19,7 @@ def build_bipartite_graph(
         alpha: float = 0.7,
         lambda_: float = 0.3,
 ) -> nx.DiGraph:
-    """_summary
-    Build a weighted bipartite flow network between reference and hypothesis words.
+    """Build a weighted bipartite flow network between reference and hypothesis words.
 
     The alignment is modeled as finding the min-cost max-flow in a bipartite network
     G = (R' ∪ H', E) with source s and sink t.
@@ -30,15 +29,16 @@ def build_bipartite_graph(
     All edge capacities are 1 (unit flow).
 
     Args:
-    - ref_words: list of words in the reference sentence
-    - hyp_words: list of words in the hypothesis sentence
-    - max_word_len: global max word length for normalizing Levenshtein distance (if global normalization is used)
-    - max_sent_len: global max sentence length for normalizing position score
-    - is_levenshtein_normalization_global: whether to use global or local normalization for Levenshtein distance when calculating word similarity
-    - alpha: weight for combining lexical and positional similarity into a single score (default 0.7 means 70% lexical, 30% positional)
-    - lambda_: penalty cost for unmatched words (flow through ε-nodes), in [0, 1] (default 0.3 means 30% penalty)
+        ref_words: List of words in the reference sentence.
+        hyp_words: List of words in the hypothesis sentence.
+        max_word_len: Global max word length for normalizing Levenshtein distance (if global normalization is used).
+        max_sent_len: Global max sentence length for normalizing position score.
+        is_levenshtein_normalization_global: Whether to use global or local normalization for Levenshtein distance when calculating word similarity.
+        alpha: Weight for combining lexical and positional similarity into a single score (default 0.7 means 70% lexical, 30% positional).
+        lambda_: Penalty cost for unmatched words (flow through ε-nodes), in [0, 1] (default 0.3 means 30% penalty).
+
     Returns:
-    - G: a NetworkX directed graph representing the bipartite flow network with nodes and edges as described above.
+        A NetworkX directed graph representing the bipartite flow network with nodes and edges as described above.
     """
     # --- Graph ---
     G = nx.DiGraph()
@@ -139,9 +139,31 @@ def calculate_cost(  # TODO move to calculations, costs over the whole sentence 
         target_position: int,
         global_max_word_length: int,
         global_max_sentence_length: int,
-        use_gloabal_levenshtein_normalization: bool,  # logic shouldnt be here, maybe object for params
+        use_gloabal_levenshtein_normalization: bool,  # TODO logic shouldnt be here, maybe object for params
         alpha: float = 0.5,
 ) -> float:
+    """Calculate the cost between two words based on their lexical and positional similarity.
+
+    This function determines the similarity between two words using the Levenshtein distance, which
+    can be normalized either globally or locally. It also considers the positional difference
+    of the words in their respective sentences, normalized by the global maximum sentence length.
+    The final cost is computed as one minus the weighted combination of lexical and positional
+    similarity scores.
+
+    Args:
+        src_word: The source word for comparison.
+        src_position: The position of the source word in the sentence.
+        target_word: The target word for comparison.
+        target_position: The position of the target word in the sentence.
+        global_max_word_length: The globally known maximum length of any word in the dataset.
+        global_max_sentence_length: The globally known maximum length of any sentence in the dataset.
+        use_gloabal_levenshtein_normalization: A flag indicating whether to normalize Levenshtein
+            distance globally or locally.
+        alpha: A weighting factor for combining lexical and positional similarity. Defaults to 0.5.
+
+    Returns:
+        A float representing the cost calculated as one minus the combined similarity score.
+    """
     # Calculate word similarity (lexical similarity) using Levenshtein distance, normalized either globally or locally. TODO also levels?
     if use_gloabal_levenshtein_normalization:
         word_similarity = calculate_word_similarity_global(
