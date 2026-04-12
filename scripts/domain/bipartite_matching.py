@@ -41,7 +41,6 @@ def build_bipartite_graph(
     Returns:
         A NetworkX directed graph representing the bipartite flow network with nodes and edges as described above.
     """
-    assert calculation_parameters is not None
 
     # --- Graph ---
     G = nx.DiGraph()
