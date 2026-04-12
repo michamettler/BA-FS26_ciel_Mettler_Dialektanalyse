@@ -94,7 +94,7 @@ def calculate_score_harmonic(word_score: float, position_score: float) -> float:
 # -- Helper functions --
 
 def _calculate_word_similarity_global(
-        src_word: str, target_word: str, global_max_word_length: int
+        src_word: str, target_word: str, global_max_word_length: int | None
 ) -> float:
     """Calculate normalized Levenshtein similarity using a global maximum word length.
 
@@ -110,6 +110,11 @@ def _calculate_word_similarity_global(
         Similarity in [0.0, 1.0]. Higher means more similar.
     """
     distance = Levenshtein.distance(src_word, target_word)
+
+    if global_max_word_length is None:
+        raise ValueError(
+            "global_max_word_length must be set when use_global_levenshtein_normalization is True"
+        )
 
     if global_max_word_length > 0:
         return max(0.0, 1 - (distance / global_max_word_length))
