@@ -21,9 +21,21 @@ class CalculationParameters:
 
     def __post_init__(self):
         if self.max_word_len is None:
-            raise ValueError(f"max_word_len must be set")
+            raise ValueError("max_word_len must be set")
         if self.max_sent_len is None:
-            raise ValueError(f"max_sent_len must be set")
+            raise ValueError("max_sent_len must be set")
+        if self.max_word_len <= 0:
+            raise ValueError(
+                f"max_word_len must be greater than 0 for normalization; got {self.max_word_len}"
+            )
+        if self.max_sent_len <= 0:
+            raise ValueError(
+                f"max_sent_len must be greater than 0 for normalization; got {self.max_sent_len}"
+            )
+        if not 0 <= self.alpha <= 1:
+            raise ValueError(f"alpha must be between 0 and 1 inclusive; got {self.alpha}")
+        if not 0 <= self.lambda_ <= 1:
+            raise ValueError(f"lambda_ must be between 0 and 1 inclusive; got {self.lambda_}")
 
 
 @dataclass
