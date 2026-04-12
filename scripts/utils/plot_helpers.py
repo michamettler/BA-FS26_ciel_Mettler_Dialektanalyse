@@ -163,7 +163,7 @@ def plot_reduced_bipartite_graph_with_matching(
     for u, v, score in scored_edges:
         label_x = pos[u][0] + stub_len * 0.7  # towards the end of the horizontal stub
         label_y = pos[u][1]
-        ax.text(label_x, label_y, f"{score:.2f}", fontsize=7, ha="center", va="center",
+        ax.text(label_x, label_y, f"{score:.3f}", fontsize=7, ha="center", va="center",
                 color=_COLOR_SCORE_LABEL, zorder=5,
                 bbox=dict(boxstyle="round,pad=0.15", fc="white", ec="none", alpha=0.9))
 

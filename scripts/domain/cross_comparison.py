@@ -4,14 +4,14 @@ Cross-comparison logic for word-level dialect analysis.
 
 import pandas as pd
 
-from domain.models import WordScore
+from domain.models import WordSimilarity
 from domain.calculations import (
     clean,
     calculate_levenshtein_distance,
     normalize_levenshtein_distance,
-    calculate_position_score,
-    calculate_score_weighted,
-    calculate_score_harmonic,
+    calculate_position_similarity,
+    calculate_weighted_similarity,
+    calculate_harmonic_similarity,
 )
 
 
@@ -40,7 +40,7 @@ def generate_cross_comparison_df(
         n_dat_words = len(dat_words)  # number of words in DAT target sentence
 
         for i, src_word in enumerate(src_words):
-            dit_scores: list[WordScore] = evaluate_scores(
+            dit_scores: list[WordSimilarity] = evaluate_scores(
                 alpha,
                 dit_words,
                 src_word,
@@ -48,7 +48,7 @@ def generate_cross_comparison_df(
                 global_max_word_length,
                 global_max_sentence_length,
             )
-            dat_scores: list[WordScore] = evaluate_scores(
+            dat_scores: list[WordSimilarity] = evaluate_scores(
                 alpha,
                 dat_words,
                 src_word,
@@ -68,13 +68,13 @@ def generate_cross_comparison_df(
                         "src_word": src_word,
                         "dit_word": dit.target_word,
                         "dat_word": dat.target_word,
-                        "dit_word_score": dit.word_score,
-                        "dat_word_score": dat.word_score,
-                        "position_score": dit.position_score,
-                        "dit_score_weighted": dit.score_weighted,
-                        "dit_score_harmonic": dit.score_harmonic,
-                        "dat_score_weighted": dat.score_weighted,
-                        "dat_score_harmonic": dat.score_harmonic,
+                        "dit_word_similarity": dit.word_similarity,
+                        "dat_word_similarity": dat.word_similarity,
+                        "position_similarity": dit.position_similarity,
+                        "dit_similarity_weighted": dit.similarity_weighted,
+                        "dit_similarity_harmonic": dit.similarity_harmonic,
+                        "dat_similarity_weighted": dat.similarity_weighted,
+                        "dat_similarity_harmonic": dat.similarity_harmonic,
                         "src_len": n_src_words,
                         "dit_len": n_dit_words,
                         "dat_len": n_dat_words,
@@ -88,7 +88,7 @@ def evaluate_scores(
     alpha, target_words, src_word, i, global_max_word_length, global_max_sentence_length
 ):
     """Compares src_word against every word in target_words.
-    Returns a list of WordScore objects, one per target word.
+    Returns a list of WordSimilarity objects, one per target word.
     i = source word index
     j = target word index
     """
@@ -98,20 +98,20 @@ def evaluate_scores(
         word_similarity = normalize_levenshtein_distance(
             lev_distance, global_max_word_length
         )
-        position_score = calculate_position_score(i, j, global_max_sentence_length)
-        score_weighted = calculate_score_weighted(
-            word_similarity, position_score, alpha
+        position_similarity = calculate_position_similarity(i, j, global_max_sentence_length)
+        similarity_weighted = calculate_weighted_similarity(
+            word_similarity, position_similarity, alpha
         )
-        score_harmonic = calculate_score_harmonic(word_similarity, position_score)
+        similarity_harmonic = calculate_harmonic_similarity(word_similarity, position_similarity)
 
-        word_score = WordScore(
+        word_sim = WordSimilarity(
             j,
             target_word,
             word_similarity,
-            position_score,
-            score_weighted,
-            score_harmonic,
+            position_similarity,
+            similarity_weighted,
+            similarity_harmonic,
         )
 
-        results.append(word_score)
+        results.append(word_sim)
     return results
