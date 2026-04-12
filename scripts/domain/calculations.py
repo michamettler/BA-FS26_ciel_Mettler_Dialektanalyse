@@ -110,7 +110,11 @@ def _calculate_word_similarity_global(
         Similarity in [0.0, 1.0]. Higher means more similar.
     """
     distance = Levenshtein.distance(src_word, target_word)
-    return 1 - (distance / global_max_word_length)
+
+    if global_max_word_length > 0:
+        return 1 - (distance / global_max_word_length)
+    else:
+        return 1.0
 
 
 def _calculate_word_similarity_local(src_word: str, target_word: str) -> float:
