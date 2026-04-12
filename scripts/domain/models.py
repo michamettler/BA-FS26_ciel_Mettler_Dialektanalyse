@@ -7,7 +7,7 @@ class CalculationParameters:
 
     Tuning parameters:
         alpha: Weight for lexical vs. positional similarity (default 0.7 = 70 % lexical).
-        lambda_: Penalty cost for unmatched words routed through ε-nodes, in [0, 1].
+        lambda_: Penalty cost for unmatched words routed through epsilon-nodes, in [0, 1].
         use_global_levenshtein_normalization: Whether to normalize Levenshtein distance
             globally (by max_word_len) or locally (per word pair).
         max_word_len: Optional longest word length used for global Levenshtein
@@ -16,7 +16,7 @@ class CalculationParameters:
     """
     max_sent_len: int
     alpha: float = 0.7
-    lambda_: float = 0.3
+    lambda_: float = 0.7
     use_global_levenshtein_normalization: bool = False
     max_word_len: int | None = None
 
@@ -43,11 +43,11 @@ class CalculationParameters:
 
 
 @dataclass
-class WordScore:
-    """Scores for comparing a source word against a single target word."""
+class WordSimilarity:
+    """Similarity scores for comparing a source word against a single target word."""
     target_index: int
     target_word: str
-    word_score: float
-    position_score: float
-    score_weighted: float
-    score_harmonic: float
+    word_similarity: float
+    position_similarity: float
+    similarity_weighted: float
+    similarity_harmonic: float

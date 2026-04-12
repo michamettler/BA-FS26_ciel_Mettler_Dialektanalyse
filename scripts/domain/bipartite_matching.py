@@ -1,5 +1,9 @@
 import networkx as nx
-from calculations import calculate_cost_for_word_pair_by_lexical_and_positional_score
+
+from calculations import (
+    calculate_similarity_for_word_pair_by_weighted_lexical_and_positional_similarities,
+    calculate_cost_for_word_pair_by_similarity
+)
 from models import CalculationParameters
 from preprocessing import clean_word
 
@@ -14,9 +18,6 @@ ATTR_WORD = "word"
 ATTR_PARTITION = "partition"
 ATTR_LABEL = "label"
 ATTR_SCORE = "score"
-
-# Scale factor: network simplex requires integer weights, so float costs are scaled to ints. TODO remove
-_COST_SCALE = 1000
 
 
 def build_bipartite_graph(
@@ -81,40 +82,48 @@ def build_bipartite_graph(
             ref_word = clean_word(ref_words[i])
             hyp_word = clean_word(hyp_words[j])
 
-            cost = calculate_cost_for_word_pair_by_lexical_and_positional_score(
-                src_word=ref_word,
-                src_position=i,
-                target_word=hyp_word,
-                target_position=j,
+            similarity = calculate_similarity_for_word_pair_by_weighted_lexical_and_positional_similarities(
+                ref_word=ref_word,
+                ref_position=i,
+                hyp_word=hyp_word,
+                hyp_position=j,
                 calculation_parameters=calculation_parameters,
             )
+            cost = calculate_cost_for_word_pair_by_similarity(similarity)
+
             G.add_edge(
                 _get_node_name(REFERENCE_PARTITION, i),
                 _get_node_name(HYPOTHESIS_PARTITION, j),
                 capacity=1,
-                weight=int(cost * _COST_SCALE),
-                score=1 - cost,
+                weight=cost,
+                score=similarity,
             )
     # edges from ref word nodes to hyp ε-nodes
     for i in range(n_r):
         for k in range(n_r):
+            similarity = calculation_parameters.lambda_
+            cost = calculate_cost_for_word_pair_by_similarity(similarity)
+
             G.add_edge(
                 _get_node_name(REFERENCE_PARTITION, i),
                 _get_node_name(HYPOTHESIS_PARTITION, k, eps=True),
                 capacity=1,
-                weight=int(calculation_parameters.lambda_ * _COST_SCALE),
-                score=1 - calculation_parameters.lambda_,
+                weight=cost,
+                score=similarity,
             )
 
     # edges from ref ε-nodes to hyp word nodes
     for j in range(n_h):
         for k in range(n_h):
+            similarity = calculation_parameters.lambda_
+            cost = calculate_cost_for_word_pair_by_similarity(similarity)
+
             G.add_edge(
                 _get_node_name(REFERENCE_PARTITION, j, eps=True),
                 _get_node_name(HYPOTHESIS_PARTITION, k),
                 capacity=1,
-                weight=int(calculation_parameters.lambda_ * _COST_SCALE),
-                score=1 - calculation_parameters.lambda_,
+                weight=cost,
+                score=similarity,
             )
     # edges from ref ε-nodes to hyp ε-nodes
     for j in range(n_h):
