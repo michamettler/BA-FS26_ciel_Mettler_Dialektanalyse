@@ -10,24 +10,28 @@ class CalculationParameters:
         lambda_: Penalty cost for unmatched words routed through ε-nodes, in [0, 1].
         use_global_levenshtein_normalization: Whether to normalize Levenshtein distance
             globally (by max_word_len) or locally (per word pair).
-        max_word_len: Longest word length used for global Levenshtein normalization.
+        max_word_len: Optional longest word length used for global Levenshtein
+            normalization. Required only when global normalization is enabled.
         max_sent_len: Longest sentence length used for positional-score normalization.
     """
-    max_word_len: int
     max_sent_len: int
     alpha: float = 0.7
     lambda_: float = 0.3
     use_global_levenshtein_normalization: bool = False
+    max_word_len: int | None = None
 
     def __post_init__(self):
-        if self.max_word_len is None:
-            raise ValueError("max_word_len must be set")
         if self.max_sent_len is None:
             raise ValueError("max_sent_len must be set")
-        if self.max_word_len <= 0:
-            raise ValueError(
-                f"max_word_len must be greater than 0 for normalization; got {self.max_word_len}"
-            )
+        if self.use_global_levenshtein_normalization:
+            if self.max_word_len is None:
+                raise ValueError(
+                    "max_word_len must be set when use_global_levenshtein_normalization is enabled"
+                )
+            if self.max_word_len <= 0:
+                raise ValueError(
+                    f"max_word_len must be greater than 0 for normalization; got {self.max_word_len}"
+                )
         if self.max_sent_len <= 0:
             raise ValueError(
                 f"max_sent_len must be greater than 0 for normalization; got {self.max_sent_len}"
