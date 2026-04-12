@@ -2,6 +2,8 @@
 Shared helper functions for dialect analysis scripts.
 """
 
+from models import CalculationParameters
+
 import Levenshtein
 
 
@@ -10,10 +12,7 @@ def calculate_cost_for_word_pair_by_lexical_and_positional_score(
         src_position: int,
         target_word: str,
         target_position: int,
-        global_max_word_length: int,
-        global_max_sentence_length: int,
-        use_global_levenshtein_normalization: bool,  # TODO logic shouldnt be here, maybe object for params
-        alpha: float = 0.7,
+        calculation_parameters: CalculationParameters,
 ) -> float:
     """Calculate the cost between two words based on their lexical and positional similarity.
 
@@ -28,21 +27,17 @@ def calculate_cost_for_word_pair_by_lexical_and_positional_score(
         src_position: The position of the source word in the sentence.
         target_word: The target word for comparison.
         target_position: The position of the target word in the sentence.
-        global_max_word_length: The globally known maximum length of any word in the dataset.
-        global_max_sentence_length: The globally known maximum length of any sentence in the dataset.
-        use_global_levenshtein_normalization: A flag indicating whether to normalize Levenshtein
-            distance globally or locally.
-        alpha: A weighting factor for combining lexical and positional similarity. Defaults to 0.7.
+        calculation_parameters: Matching configuration (alpha, normalization mode, max lengths).
 
     Returns:
         A float representing the cost calculated as one minus the combined similarity score.
     """
     # Calculate word similarity (lexical similarity) using Levenshtein distance, normalized either globally or locally. TODO also levels?
-    if use_global_levenshtein_normalization:
+    if calculation_parameters.use_global_levenshtein_normalization:
         word_similarity = _calculate_word_similarity_global(
             src_word=src_word,
             target_word=target_word,
-            global_max_word_length=global_max_word_length,
+            global_max_word_length=calculation_parameters.max_word_len,
         )
     else:
         word_similarity = _calculate_word_similarity_local(
@@ -53,11 +48,11 @@ def calculate_cost_for_word_pair_by_lexical_and_positional_score(
     position_score = _calculate_position_score(  # TODO maybe in levels (based on neighbourhood)
         src_index=src_position,
         target_index=target_position,
-        global_max_sentence_length=global_max_sentence_length,
+        global_max_sentence_length=calculation_parameters.max_sent_len,
     )
 
     # Combine lexical and positional similarity into a single score using a weighted average.
-    score = calculate_score_weighted(word_similarity, position_score, alpha=alpha)
+    score = calculate_score_weighted(word_similarity, position_score, alpha=calculation_parameters.alpha)
 
     return 1 - score  # Convert similarity to cost
 
@@ -99,7 +94,7 @@ def calculate_score_harmonic(word_score: float, position_score: float) -> float:
 # -- Helper functions --
 
 def _calculate_word_similarity_global(
-        src_word: str, target_word: str, global_max_word_length: int
+        src_word: str, target_word: str, global_max_word_length: int | None
 ) -> float:
     """Calculate normalized Levenshtein similarity using a global maximum word length.
 
@@ -116,8 +111,13 @@ def _calculate_word_similarity_global(
     """
     distance = Levenshtein.distance(src_word, target_word)
 
+    if global_max_word_length is None:
+        raise ValueError(
+            "global_max_word_length must be set when use_global_levenshtein_normalization is True"
+        )
+
     if global_max_word_length > 0:
-        return 1 - (distance / global_max_word_length)
+        return max(0.0, 1 - (distance / global_max_word_length))
     else:
         return 1.0
 
@@ -159,6 +159,6 @@ def _calculate_position_score(
         max_possible_distance = (
                 global_max_sentence_length - 1
         )  # -1 because max index gap in a sequence of length n is n-1, needed for worst case to be 0
-        return 1.0 - (distance_to_target_word / max_possible_distance)
+        return max(0.0, 1.0 - (distance_to_target_word / max_possible_distance))
     else:
         return 1.0  # sentence only has 0 or 1 word, so position is irrelevant - treat as perfect match
