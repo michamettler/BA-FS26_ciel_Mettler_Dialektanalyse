@@ -1,6 +1,6 @@
 import networkx as nx
 from calculations import calculate_cost_for_word_pair_by_lexical_and_positional_score
-from utils.preprocessing import clean_word
+from preprocessing import clean_word
 
 EPS = "ε"  # epsilon symbol, used for unmatched padding nodes
 SOURCE_NODE = "s"
