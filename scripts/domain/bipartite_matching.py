@@ -1,8 +1,6 @@
 import networkx as nx
-from domain.calculations import (
-    _clean,
-    calculate_cost_for_word_pair_by_lexical_and_positional_score
-)
+from calculations import calculate_cost_for_word_pair_by_lexical_and_positional_score
+from utils.preprocessing import clean_word
 
 EPS = "ε"  # epsilon symbol, used for unmatched padding nodes
 SOURCE_NODE = "s"
@@ -86,8 +84,8 @@ def build_bipartite_graph(
     # edges from ref word nodes to hyp word nodes
     for i in range(n_r):
         for j in range(n_h):
-            ref_word = _clean(ref_words[i])
-            hyp_word = _clean(hyp_words[j])
+            ref_word = clean_word(ref_words[i])
+            hyp_word = clean_word(hyp_words[j])
 
             cost = calculate_cost_for_word_pair_by_lexical_and_positional_score(
                 src_word=ref_word,

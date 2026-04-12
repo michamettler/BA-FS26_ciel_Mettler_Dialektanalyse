@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import matplotlib.ticker as mticker
 import networkx as nx
-from domain.bipartite_matching import (
+from bipartite_matching import (
     EPS,
     SOURCE_NODE,
     SINK_NODE,

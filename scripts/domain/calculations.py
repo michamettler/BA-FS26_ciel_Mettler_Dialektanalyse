@@ -2,8 +2,6 @@
 Shared helper functions for dialect analysis scripts.
 """
 
-import re
-import pandas as pd
 import Levenshtein
 
 
@@ -15,7 +13,7 @@ def calculate_cost_for_word_pair_by_lexical_and_positional_score(
         global_max_word_length: int,
         global_max_sentence_length: int,
         use_global_levenshtein_normalization: bool,  # TODO logic shouldnt be here, maybe object for params
-        alpha: float = 0.5,
+        alpha: float = 0.7,
 ) -> float:
     """Calculate the cost between two words based on their lexical and positional similarity.
 
@@ -34,7 +32,7 @@ def calculate_cost_for_word_pair_by_lexical_and_positional_score(
         global_max_sentence_length: The globally known maximum length of any sentence in the dataset.
         use_global_levenshtein_normalization: A flag indicating whether to normalize Levenshtein
             distance globally or locally.
-        alpha: A weighting factor for combining lexical and positional similarity. Defaults to 0.5.
+        alpha: A weighting factor for combining lexical and positional similarity. Defaults to 0.7.
 
     Returns:
         A float representing the cost calculated as one minus the combined similarity score.
@@ -75,7 +73,7 @@ def calculate_score_weighted(
         alpha: Weight for lexical similarity; (1 - alpha) is applied to positional. Defaults to 0.5.
 
     Returns:
-        Combined score in [0.0, 1.0]. Higher means better match.
+        Combined score in [0.0, 1.0]. Higher means a better match.
     """
     return alpha * word_score + (1 - alpha) * position_score
 
@@ -91,7 +89,7 @@ def calculate_score_harmonic(word_score: float, position_score: float) -> float:
         position_score: Positional similarity score in [0.0, 1.0].
 
     Returns:
-        Harmonic mean in [0.0, 1.0]. Higher means better match.
+        Harmonic mean in [0.0, 1.0]. Higher means a better match.
     """
     if word_score + position_score == 0:
         return 0.0
@@ -99,26 +97,6 @@ def calculate_score_harmonic(word_score: float, position_score: float) -> float:
 
 
 # -- Helper functions --
-
-def _clean(text: str) -> str:
-    """Clean and normalize text for comparison.
-
-    Lowercases, replaces ß with ss (Swiss German convention), and removes
-    all characters except a-z, digits, and German umlauts (äöü).
-
-    Args:
-        text: Raw input text to clean.
-
-    Returns:
-        Cleaned and normalized string.
-    """
-    if pd.isna(text):
-        return ""
-    text = str(text).lower()
-    text = text.replace("ß", "ss")
-    text = re.sub(r"[^a-z0-9äöü\s]", "", text)
-    return text.strip()
-
 
 def _calculate_word_similarity_global(
         src_word: str, target_word: str, global_max_word_length: int
