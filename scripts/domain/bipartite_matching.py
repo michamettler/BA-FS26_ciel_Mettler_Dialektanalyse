@@ -101,7 +101,7 @@ def build_bipartite_graph(
     # edges from ref word nodes to hyp ε-nodes
     for i in range(n_r):
         for k in range(n_r):
-            similarity = calculation_parameters.lambda_
+            similarity = 1 - calculation_parameters.lambda_
             cost = calculate_cost_for_word_pair_by_similarity(similarity)
 
             G.add_edge(
@@ -115,7 +115,7 @@ def build_bipartite_graph(
     # edges from ref ε-nodes to hyp word nodes
     for j in range(n_h):
         for k in range(n_h):
-            similarity = calculation_parameters.lambda_
+            similarity = 1 - calculation_parameters.lambda_
             cost = calculate_cost_for_word_pair_by_similarity(similarity)
 
             G.add_edge(
