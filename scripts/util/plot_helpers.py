@@ -51,8 +51,8 @@ def plot_bipartite_graph_full(
         G: Full flow network.
     """
     # --- collect nodes by partition & build layout ---
-    ref_nodes = _collect_nodes_by_partition(G, REFERENCE_PARTITION)
-    hyp_nodes = _collect_nodes_by_partition(G, HYPOTHESIS_PARTITION)
+    ref_nodes = _collect_and_sort_nodes_by_partition(G, REFERENCE_PARTITION)
+    hyp_nodes = _collect_and_sort_nodes_by_partition(G, HYPOTHESIS_PARTITION)
 
     pos, N = _build_layout(ref_nodes, hyp_nodes)
 
@@ -93,7 +93,7 @@ def plot_bipartite_graph_full(
     plt.show()
 
 
-def plot_bipartite_graph(
+def plot_reduced_bipartite_graph_with_matching(
         G: nx.DiGraph,
         matching: dict[str, str]
 ):
@@ -112,8 +112,8 @@ def plot_bipartite_graph(
     M = _build_reduced_graph(G, matching)
 
     # collect nodes by partition & build layout
-    ref_nodes = _collect_nodes_by_partition(M, REFERENCE_PARTITION)
-    hyp_nodes = _collect_nodes_by_partition(M, HYPOTHESIS_PARTITION)
+    ref_nodes = _collect_and_sort_nodes_by_partition(M, REFERENCE_PARTITION)
+    hyp_nodes = _collect_and_sort_nodes_by_partition(M, HYPOTHESIS_PARTITION)
 
     pos, N = _build_layout(ref_nodes, hyp_nodes)
 
@@ -208,7 +208,7 @@ def plot_score_distribution(data, title):
 
 # --- Helper Functions ---
 
-def _collect_nodes_by_partition(graph: nx.DiGraph, partition: str) -> list[str]:
+def _collect_and_sort_nodes_by_partition(graph: nx.DiGraph, partition: str) -> list[str]:
     """Collect and sort nodes belonging to a given partition.
 
     Args:
