@@ -4,7 +4,10 @@ from pathlib import Path
 from tqdm import tqdm
 from gradio_client import Client, handle_file
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
+SUBSET_DIR = Path(__file__).resolve().parent.parent
+SOURCE_TSV = SUBSET_DIR / "zurich_subset_metadata.tsv"
+OUTPUT_DIR = SUBSET_DIR / "stt-transcript-analysis"
 
 UPLOAD_URL = "https://stt4sg.fhnw.ch/long_v3/"
 STATUS_URL = "https://stt4sg.fhnw.ch/long_v3/status/"
@@ -16,26 +19,23 @@ def _extract_uuid(result_text: str) -> str | None:
     return match.group(1) if match else None
 
 
-def transcribe(output_tsv, subset):
+def transcribe(output_tsv):
     """
     Partly AI generated code for file mgmt & api call
     """
-    analysis_dir = PROJECT_ROOT / "samples" / subset
-    source_tsv = analysis_dir / "subset_metadata.tsv"
-
     print("--- Connecting to FHNW STT4SG Upload Endpoint ---")
     upload_client = Client(UPLOAD_URL)
 
-    if not source_tsv.exists():
-        print(f"Error: {source_tsv} not found.")
+    if not SOURCE_TSV.exists():
+        print(f"Error: {SOURCE_TSV} not found.")
         return
 
-    df = pd.read_csv(source_tsv, sep="\t", encoding="utf-8-sig")
+    df = pd.read_csv(SOURCE_TSV, sep="\t", encoding="utf-8-sig")
     transcriptions = []
 
     print(f"Transcribing {len(df)} files ...")
     for _, row in tqdm(df.iterrows(), total=len(df)):
-        audio_path = analysis_dir / row["path"]
+        audio_path = PROJECT_ROOT / row["path"]
         if not audio_path.exists():
             transcriptions.append("ERROR: FILE NOT FOUND")
             continue
@@ -67,7 +67,7 @@ def transcribe(output_tsv, subset):
             transcriptions.append("ERROR: TRANSCRIPTION FAILED")
 
     df["transcript"] = transcriptions
-    output_path = analysis_dir / "fhnw" / output_tsv
+    output_path = OUTPUT_DIR / output_tsv
     output_path.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(output_path, sep="\t", index=False, encoding="utf-8-sig")
     print(f"\nSuccess! File saved at: {output_path}")
