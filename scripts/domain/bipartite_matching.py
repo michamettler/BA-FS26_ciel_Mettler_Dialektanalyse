@@ -1,5 +1,5 @@
 import networkx as nx
-from calculations import (
+from domain.calculations import (
     _clean,
     calculate_cost_for_word_pair_by_lexical_and_positional_score
 )
