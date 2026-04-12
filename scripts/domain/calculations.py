@@ -112,7 +112,7 @@ def _calculate_word_similarity_global(
     distance = Levenshtein.distance(src_word, target_word)
 
     if global_max_word_length > 0:
-        return 1 - (distance / global_max_word_length)
+        return max(0.0, 1 - (distance / global_max_word_length))
     else:
         return 1.0
 
@@ -154,6 +154,6 @@ def _calculate_position_score(
         max_possible_distance = (
                 global_max_sentence_length - 1
         )  # -1 because max index gap in a sequence of length n is n-1, needed for worst case to be 0
-        return 1.0 - (distance_to_target_word / max_possible_distance)
+        return max(0.0, 1.0 - (distance_to_target_word / max_possible_distance))
     else:
         return 1.0  # sentence only has 0 or 1 word, so position is irrelevant - treat as perfect match
