@@ -12,6 +12,15 @@ from bipartite_matching import (
     ATTR_PARTITION,
     ATTR_LABEL,
     ATTR_SCORE,
+    build_reduced_graph_by_matching,
+    extract_index_from_node_name,
+    is_eps_node,
+    get_source_edges,
+    get_sink_edges,
+    get_bipartite_edges,
+    get_word_edges,
+    get_epsilon_edges,
+    get_nodes_by_partition,
 )
 
 # --- Colors ---
@@ -51,8 +60,12 @@ def plot_bipartite_graph_full(
         G: Full flow network.
     """
     # collect nodes by partition & build layout
-    ref_nodes = _collect_and_sort_nodes_by_partition(G, REFERENCE_PARTITION)
-    hyp_nodes = _collect_and_sort_nodes_by_partition(G, HYPOTHESIS_PARTITION)
+    ref_nodes = _sort_nodes_for_display(
+        get_nodes_by_partition(G, REFERENCE_PARTITION)
+    )
+    hyp_nodes = _sort_nodes_for_display(
+        get_nodes_by_partition(G, HYPOTHESIS_PARTITION)
+    )
 
     pos, N = _build_layout(ref_nodes, hyp_nodes)
 
@@ -60,9 +73,9 @@ def plot_bipartite_graph_full(
     labels, node_colors, node_sizes = _get_style_for_nodes(G)
 
     # classify edges
-    source_edges = _get_source_edges(G)
-    sink_edges = _get_sink_edges(G)
-    bipartite_edges = _get_bipartite_edges(G)
+    source_edges = get_source_edges(G)
+    sink_edges = get_sink_edges(G)
+    bipartite_edges = get_bipartite_edges(G)
 
     # --- draw ---
     fig, ax = plt.subplots(figsize=(12, N * 0.5 + 1.5))
@@ -106,14 +119,20 @@ def plot_reduced_bipartite_graph_with_matching(
         matching: Dict mapping of reference and hypothesis partitions.
     """
     # color map to visualize scores
-    cmap = mcolors.LinearSegmentedColormap.from_list("rg", [_COLOR_SCORE_LOW, _COLOR_SCORE_MID, _COLOR_SCORE_HIGH])
+    cmap = mcolors.LinearSegmentedColormap.from_list(
+        "rg", [_COLOR_SCORE_LOW, _COLOR_SCORE_MID, _COLOR_SCORE_HIGH]
+    )
 
     # build matching graph (doesn't include epsilon-to-epsilon matchings): s -> R' -> (matching) -> H' -> t
-    M = _build_reduced_graph(G, matching)
+    M = build_reduced_graph_by_matching(G, matching)
 
     # collect nodes by partition & build layout
-    ref_nodes = _collect_and_sort_nodes_by_partition(M, REFERENCE_PARTITION)
-    hyp_nodes = _collect_and_sort_nodes_by_partition(M, HYPOTHESIS_PARTITION)
+    ref_nodes = _sort_nodes_for_display(
+        get_nodes_by_partition(M, REFERENCE_PARTITION)
+    )
+    hyp_nodes = _sort_nodes_for_display(
+        get_nodes_by_partition(M, HYPOTHESIS_PARTITION)
+    )
 
     pos, N = _build_layout(ref_nodes, hyp_nodes)
 
@@ -121,10 +140,10 @@ def plot_reduced_bipartite_graph_with_matching(
     labels, node_colors, node_sizes = _get_style_for_nodes(M)
 
     # classify edges
-    matching_edges = _get_bipartite_edges(M)
-    source_sink_edges = _get_source_edges(M) + _get_sink_edges(M)
-    eps_edges = _get_epsilon_edges(M, matching_edges)
-    word_edges = _get_word_edges(M, matching_edges)
+    matching_edges = get_bipartite_edges(M)
+    source_sink_edges = get_source_edges(M) + get_sink_edges(M)
+    eps_edges = get_epsilon_edges(M, matching_edges)
+    word_edges = get_word_edges(M, matching_edges)
 
     # --- draw ---
     fig, ax = plt.subplots(figsize=(12, N * 0.5 + 1.5))
@@ -207,102 +226,24 @@ def plot_score_distribution(data, title):
 
 # --- Helper Functions ---
 
-def _collect_and_sort_nodes_by_partition(graph: nx.DiGraph, partition: str) -> list[str]:
-    nodes = [str(node) for node, attrs in graph.nodes(data=True)
-             if attrs.get(ATTR_PARTITION) == partition]
+def _sort_nodes_for_display(nodes: list[str]) -> list[str]:
+    """Sort nodes for display: real words first, then epsilon; each group sorted by index."""
     return sorted(nodes, key=_get_sort_key_for_node_order)
 
 
-def _build_reduced_graph(G: nx.DiGraph, matching: dict[str, str]) -> nx.DiGraph:
-    """Build a reduced bipartite graph from the full network and its matching.
-
-    Keeps only matched ref/hyp pairs (excluding epsilon-to-epsilon matches), with source and sink.
+def _get_sort_key_for_node_order(node_name: str) -> tuple[int, int]:
+    """Sort key for bipartite graph nodes: real words first, then epsilon; each group sorted by index.
 
     Args:
-        G: Full flow network.
-        matching: Dict mapping each reference node to its matched hypothesis node.
+        node_name: Node name like "ref_3" or "hyp_ε_2".
 
     Returns:
-        A reduced NetworkX directed graph with s -> ref -> hyp -> t edges for non-trivial matches.
+        A tuple (is_eps, idx), where is_eps is 0 for real words and 1 for epsilon (so real words
+        come first), and idx is the extracted index for sorting inside words/epsilons.
     """
-    M = nx.DiGraph()
-
-    M.add_node(SOURCE_NODE, label=SOURCE_NODE)
-    M.add_node(SINK_NODE, label=SINK_NODE)
-
-    for ref_node, hyp_node in matching.items():
-        is_ref_eps = is_eps_node(G.nodes[ref_node])
-        is_hyp_eps = is_eps_node(G.nodes[hyp_node])
-        if is_ref_eps and is_hyp_eps:
-            continue
-
-        M.add_node(ref_node, word=G.nodes[ref_node][ATTR_WORD], label=G.nodes[ref_node][ATTR_WORD], partition=REFERENCE_PARTITION)
-        M.add_edge(SOURCE_NODE, ref_node, score=None)
-        M.add_node(hyp_node, word=G.nodes[hyp_node][ATTR_WORD], label=G.nodes[hyp_node][ATTR_WORD], partition=HYPOTHESIS_PARTITION)
-        M.add_edge(hyp_node, SINK_NODE, score=None)
-
-        score = G.edges[ref_node, hyp_node].get(ATTR_SCORE)
-        M.add_edge(ref_node, hyp_node, score=score)
-
-    return M
-
-
-def _get_source_edges(graph: nx.DiGraph) -> list[tuple[str, str]]:
-    return [(u, v) for u, v in graph.edges() if u == SOURCE_NODE]
-
-
-def _get_sink_edges(graph: nx.DiGraph) -> list[tuple[str, str]]:
-    return [(u, v) for u, v in graph.edges() if v == SINK_NODE]
-
-
-def _get_bipartite_edges(graph: nx.DiGraph) -> list[tuple[str, str]]:
-    """Get all edges between the reference and hypothesis partitions (ref -> hyp).
-
-    Args:
-        graph: A NetworkX directed graph with partition attributes on nodes.
-
-    Returns:
-        A list of (u, v) tuples for edges from reference to hypothesis nodes.
-    """
-    return [(u, v) for u, v in graph.edges()
-            if graph.nodes[u].get(ATTR_PARTITION) == REFERENCE_PARTITION
-            and graph.nodes[v].get(ATTR_PARTITION) == HYPOTHESIS_PARTITION]
-
-
-def _get_word_edges(graph: nx.DiGraph, matching_edges: list[tuple[str, str]]) -> list[tuple[str, str]]:
-    """Extract word-level edges from a list of matching edges.
-
-    Filters out edges where either endpoint is an epsilon node.
-
-    Args:
-        graph: A NetworkX directed graph with "word" attributes on nodes.
-        matching_edges: A list of tuples, where each tuple represents an edge between two nodes.
-
-    Returns:
-        A list of tuples representing edges where neither node is an epsilon node.
-    """
-    return [(u, v) for u, v in matching_edges
-            if not is_eps_node(graph.nodes[u]) and not is_eps_node(graph.nodes[v])]
-
-
-def _get_epsilon_edges(graph: nx.DiGraph, matching_edges: list[tuple[str, str]]) -> list[tuple[str, str]]:
-    """Extract epsilon edges from a list of matching edges.
-
-    Returns only edges where at least one endpoint is an epsilon node.
-
-    Args:
-        graph: A NetworkX directed graph with "word" attributes on nodes.
-        matching_edges: A list of edges represented as tuples of strings.
-
-    Returns:
-        A list of edges where at least one node is an epsilon node.
-    """
-    return [(u, v) for u, v in matching_edges
-            if is_eps_node(graph.nodes[u]) or is_eps_node(graph.nodes[v])]
-
-
-def is_eps_node(attrs) -> bool:
-    return attrs.get(ATTR_WORD) == EPS
+    is_eps = 1 if EPS in node_name else 0
+    idx = extract_index_from_node_name(node_name)
+    return is_eps, idx
 
 
 def _build_layout(ref_nodes: list[str], hyp_nodes: list[str]) -> tuple[dict, int]:
@@ -358,32 +299,3 @@ def _get_style_for_nodes(graph: nx.DiGraph) -> tuple[dict, list[str], list[int]]
             node_sizes.append(1200)
 
     return labels, node_colors, node_sizes
-
-
-def _get_sort_key_for_node_order(node_name: str) -> tuple[int, int]:
-    """Sort key for bipartite graph nodes: real words first, then epsilon; each group sorted by index.
-
-    Args:
-        node_name: Node name like "ref_3" or "hyp_ε_2".
-
-    Returns:
-        A tuple (is_eps, idx), where is_eps is 0 for real words and 1 for epsilon (so real words
-        come first), and idx is the extracted index for sorting inside words/epsilons.
-    """
-    is_eps = 1 if EPS in node_name else 0
-    idx = _extract_index_from_node_name(node_name)
-    return is_eps, idx
-
-
-def _extract_index_from_node_name(node_name: str) -> int:
-    """Extract the numerical index from a node name like "ref_3" or "hyp_ε_2".
-
-    Splits on underscores and returns the last segment as an integer.
-
-    Args:
-        node_name: Node name string where the last underscore-separated segment is a numeric index.
-
-    Returns:
-        The extracted integer index.
-    """
-    return int(node_name.split("_")[-1])
