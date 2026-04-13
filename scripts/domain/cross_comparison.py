@@ -5,11 +5,22 @@ Naive baseline approach: compares every reference word against every hypothesis 
 (exhaustive O(n x m) cross-comparison without 1:1 alignment constraint).
 """
 
+from dataclasses import dataclass
+
 import pandas as pd
 
-from models import WordSimilarity
 from preprocessing import clean_word
 from word_similarity_calculator import WordSimilarityCalculator
+
+
+@dataclass
+class WordSimilarity:
+    """Similarity scores for comparing a source word against a single target word."""
+    target_index: int
+    target_word: str
+    lexical_similarity: float
+    positional_similarity: float
+    similarity_weighted: float
 
 
 def generate_cross_comparison_df(

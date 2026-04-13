@@ -19,9 +19,8 @@ class WordSimilarityCalculator:
     """Calculates word-level similarities and costs based on configurable parameters
 
     Args:
-        max_sent_len: Maximum sentence length used for positional-similarity normalization.
-            Pass the global maximum sentence length across all samples so that positional
-            scores are comparable across sentences of different lengths.
+        sent_len: sentence length used for positional-similarity normalization (either global over a whole dataset or
+            local to a single reference/hypothesis sentence).
         alpha: Weight for lexical vs. positional similarity (1 = lexical only, 0 = positional only, default 0.7).
         lambda_: Penalty for unmatched words routed through epsilon-nodes, in [0, 1].
         use_global_lexical_normalization: Normalize lexical similarity globally or locally.
@@ -30,14 +29,14 @@ class WordSimilarityCalculator:
 
     def __init__(
             self,
-            max_sent_len: int,
+            sent_len: int,
             alpha: float = 0.7,
             lambda_: float = 0.3,
             use_global_lexical_normalization: bool = False,
             max_word_len: int | None = None,
     ):
-        if max_sent_len is None or max_sent_len <= 0:
-            raise ValueError(f"max_sent_len must be > 0; got {max_sent_len}")
+        if sent_len is None or sent_len <= 0:
+            raise ValueError(f"sent_len must be > 0; got {sent_len}")
         if use_global_lexical_normalization:
             if max_word_len is None or max_word_len <= 0:
                 raise ValueError(f"max_word_len must be > 0 when global normalization is enabled; got {max_word_len}")
@@ -46,7 +45,7 @@ class WordSimilarityCalculator:
         if not 0 <= lambda_ <= 1:
             raise ValueError(f"lambda_ must be between 0 and 1; got {lambda_}")
 
-        self.max_sent_len = max_sent_len
+        self.sent_len = sent_len
         self.alpha = alpha
         self.lambda_ = lambda_
         self.use_global_lexical_normalization = use_global_lexical_normalization
@@ -100,10 +99,10 @@ class WordSimilarityCalculator:
 
         Returns 1.0 if positions are identical, 0.0 if the gap is maximal relative to the sentence length.
         """
-        if self.max_sent_len > 1:
+        if self.sent_len > 1:
             distance_to_hyp_word = abs(ref_index - hyp_index)
             max_possible_distance = (
-                    self.max_sent_len - 1
+                    self.sent_len - 1
             )  # -1 because max index gap in a sequence of length n is n-1, needed for worst case to be 0
             return max(0.0,
                        1.0 - (distance_to_hyp_word / max_possible_distance)
