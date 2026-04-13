@@ -112,11 +112,8 @@ def plot_reduced_bipartite_graph_with_matching(
 ):
     """Plot the reduced bipartite flow network using NetworkX.
 
-    The reduced graph doesn't include epsilon-to-epsilon matchings to reduce complexity.
-
-    Args:
-        G: Full flow network.
-        matching: Dict mapping of reference and hypothesis partitions.
+    The reduced graph only shows the matching edges (ref -> hyp), and the source/sink edges.
+    Epsilon-to-epsilon matches are excluded for clarity.
     """
     # color map to visualize scores
     cmap = mcolors.LinearSegmentedColormap.from_list(
@@ -199,10 +196,6 @@ def plot_reduced_bipartite_graph_with_matching(
 
 def plot_score_distribution(data, title):
     """Plot a histogram of scores with a mean value indicated by a dashed line.
-
-    Args:
-        data: Series or array of score values.
-        title: Title for the plot.
     """
     fig, ax = plt.subplots(figsize=(6, 4))
     ax.hist(data.dropna(), bins=50, color=_COLOR_HIST_BAR, edgecolor="white", linewidth=0.4)
@@ -270,15 +263,6 @@ def _build_layout(ref_nodes: list[str], hyp_nodes: list[str]) -> tuple[dict, int
 
 def _get_style_for_nodes(graph: nx.DiGraph) -> tuple[dict, list[str], list[int]]:
     """Compute labels, colors, and sizes for all nodes in a bipartite flow graph.
-
-    Node colors: gray for epsilon-nodes, partition color for ref/hyp word nodes,
-    and dedicated colors for source/sink.
-
-    Args:
-        graph: A NetworkX directed graph with bipartite flow network structure.
-
-    Returns:
-        A tuple (labels, node_colors, node_sizes) aligned with graph.nodes() iteration order.
     """
     labels = {}
     node_colors = []
