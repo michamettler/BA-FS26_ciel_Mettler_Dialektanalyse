@@ -50,16 +50,14 @@ class WordSimilarityCalculator:
         self.use_global_lexical_normalization = use_global_lexical_normalization
         self.max_word_len = max_word_len
 
-    def combined_weighted_similarities(
+    def combined_weighted_similarity(
             self,
             ref_word: str,
             ref_position: int,
             hyp_word: str,
             hyp_position: int,
-    ) -> tuple[float, float, float]:
-        """Calculate combined, lexical, and positional similarity for a word pair.
-
-        Combined similarity is a weighted average of lexical and positional similarity.
+    ) -> float:
+        """Calculate the combined similarity for a word pair as a weighted average of lexical and positional similarity.
         Alpha controls the weight (1 = lexical only, 0 = positional only).
 
         Weighted_similarity = alpha * lexical_similarity + (1 - alpha) * positional_similarity
@@ -70,13 +68,13 @@ class WordSimilarityCalculator:
             hyp_word: Hypothesis word.
             hyp_position: Hypothesis word position in the sentence.
         Returns:
-            (combined_similarity, lexical_similarity, positional_similarity)
+            The weighted combined similarity in [0.0, 1.0].
         """
         lexical_similarity = self.lexical_similarity(ref_word, hyp_word)
         positional_similarity = self.positional_similarity(ref_position, hyp_position)
 
-        combined = self.alpha * lexical_similarity + (1 - self.alpha) * positional_similarity
-        return combined, lexical_similarity, positional_similarity
+        weighted_similarity = self.alpha * lexical_similarity + (1 - self.alpha) * positional_similarity
+        return weighted_similarity
 
     def lexical_similarity(self, ref_word: str, hyp_word: str) -> float:
         """Lexical similarity via Levenshtein distance, normalized globally or locally.
@@ -113,5 +111,6 @@ class WordSimilarityCalculator:
 
     def cost_for_epsilon_by_penalty(self) -> int:
         """Convert an epsilon penalty to an integer cost for the network flow algorithm.
+
         Cost = penalty (lambda_) * _COST_SCALE, rounded to the nearest integer."""
         return round(self.lambda_ * _COST_SCALE)

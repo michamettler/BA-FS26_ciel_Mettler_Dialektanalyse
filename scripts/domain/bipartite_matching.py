@@ -78,7 +78,7 @@ def build_full_bipartite_graph(
             ref_word = clean_word(ref_words[i])
             hyp_word = clean_word(hyp_words[j])
 
-            similarity, _, _ = calculator.combined_weighted_similarities(
+            similarity = calculator.combined_weighted_similarity(
                 ref_word=ref_word,
                 ref_position=i,
                 hyp_word=hyp_word,

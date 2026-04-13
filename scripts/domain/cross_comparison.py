@@ -62,13 +62,14 @@ def _evaluate_all_pairs(
         for j, hyp_word in enumerate(hyp_words):
             hyp_word_cleaned = clean_word(hyp_word)
 
-            similarity_weighted, lexical_similarity, positional_similarity = (
-                calculator.combined_weighted_similarities(
+            lexical_similarity = calculator.lexical_similarity(ref_word_cleaned, hyp_word_cleaned)
+            positional_similarity = calculator.positional_similarity(i, j)
+            similarity_weighted = calculator.combined_weighted_similarity(
                     ref_word=ref_word_cleaned,
                     ref_position=i,
                     hyp_word=hyp_word_cleaned,
                     hyp_position=j,
-                ))
+                )
 
             pair_results.append(
                 WordSimilarity(
