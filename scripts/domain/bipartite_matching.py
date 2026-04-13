@@ -145,10 +145,10 @@ def solve_matching(G: nx.DiGraph) -> dict[str, str]:
 
     # Extract matching: for each node r in R', find the matched node h in H' with flow=1
     matching = {}
-    for w, neighbors in flow_dict.items():
-        for v, flow in neighbors.items():
-            if flow == 1 and G.nodes[v].get(ATTR_PARTITION) == HYPOTHESIS_PARTITION:
-                matching[w] = v
+    for r, neighbors in flow_dict.items():
+        for h, flow in neighbors.items():
+            if flow == 1 and G.nodes[h].get(ATTR_PARTITION) == HYPOTHESIS_PARTITION:
+                matching[r] = h
     return matching
 
 
@@ -171,21 +171,21 @@ def build_reduced_graph_by_matching(G: nx.DiGraph, matching: dict[str, str]) -> 
     M.add_node(SOURCE_NODE, label=SOURCE_NODE)
     M.add_node(SINK_NODE, label=SINK_NODE)
 
-    for ref_node, hyp_node in matching.items():
-        is_ref_eps = is_eps_node(G.nodes[ref_node])
-        is_hyp_eps = is_eps_node(G.nodes[hyp_node])
+    for r, h in matching.items():
+        is_ref_eps = is_eps_node(G.nodes[r])
+        is_hyp_eps = is_eps_node(G.nodes[h])
         if is_ref_eps and is_hyp_eps:
             continue
 
-        M.add_node(ref_node, word=G.nodes[ref_node][ATTR_WORD], label=G.nodes[ref_node][ATTR_WORD],
+        M.add_node(r, word=G.nodes[r][ATTR_WORD], label=G.nodes[r][ATTR_WORD],
                    partition=REFERENCE_PARTITION)
-        M.add_edge(SOURCE_NODE, ref_node, score=None)
-        M.add_node(hyp_node, word=G.nodes[hyp_node][ATTR_WORD], label=G.nodes[hyp_node][ATTR_WORD],
+        M.add_edge(SOURCE_NODE, r, score=None)
+        M.add_node(h, word=G.nodes[h][ATTR_WORD], label=G.nodes[h][ATTR_WORD],
                    partition=HYPOTHESIS_PARTITION)
-        M.add_edge(hyp_node, SINK_NODE, score=None)
+        M.add_edge(h, SINK_NODE, score=None)
 
-        score = G.edges[ref_node, hyp_node].get(ATTR_SCORE)
-        M.add_edge(ref_node, hyp_node, score=score)
+        score = G.edges[r, h].get(ATTR_SCORE)
+        M.add_edge(r, h, score=score)
 
     return M
 
