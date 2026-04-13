@@ -160,8 +160,9 @@ def solve_matching(G: nx.DiGraph) -> dict[str, str]:
 def build_reduced_graph_by_matching(G: nx.DiGraph, matching: dict[str, str]) -> nx.DiGraph:
     """Build a reduced bipartite graph from the full network and its matching.
 
-    Keeps only matched ref/hyp pairs (excluding epsilon-to-epsilon matches), with source and sink.
-    Only includes edges where both endpoints are in the matching.
+    Keeps only matched ref/hyp pairs (excluding epsilon-to-epsilon matches), plus
+    the source-to-ref and hyp-to-sink routing edges needed to form s -> ref -> hyp -> t
+    paths for non-trivial matches.
 
     Args:
         G: Full flow network.
