@@ -36,12 +36,13 @@ def generate_cross_comparison_df(
 
     rows = []
     for i, ref_word in enumerate(ref_words):
+        ref_word_cleaned = clean_word(ref_word)
         for sim in similarities[i]:
             rows.append(
                 {
                     "ref_index": i,
                     "hyp_index": sim.target_index,
-                    "ref_word": clean_word(ref_word),
+                    "ref_word": ref_word_cleaned,
                     "hyp_word": sim.target_word,
                     "word_similarity": sim.word_similarity,
                     "position_similarity": sim.position_similarity,
