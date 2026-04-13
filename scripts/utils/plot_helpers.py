@@ -241,7 +241,7 @@ def _build_reduced_graph(G: nx.DiGraph, matching: dict[str, str]) -> nx.DiGraph:
         M.add_node(hyp_node, word=G.nodes[hyp_node][ATTR_WORD], label=G.nodes[hyp_node][ATTR_WORD], partition=HYPOTHESIS_PARTITION)
         M.add_edge(hyp_node, SINK_NODE, score=None)
 
-        score = G.edges[ref_node, hyp_node].get(ATTR_SCORE, 0)
+        score = G.edges[ref_node, hyp_node].get(ATTR_SCORE)
         M.add_edge(ref_node, hyp_node, score=score)
 
     return M

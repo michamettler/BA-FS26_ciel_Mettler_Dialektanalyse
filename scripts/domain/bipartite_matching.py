@@ -18,7 +18,7 @@ HYPOTHESIS_PARTITION = "hyp"
 ATTR_WORD = "word"
 ATTR_PARTITION = "partition"
 ATTR_LABEL = "label"
-ATTR_SCORE = "score"
+ATTR_SCORE = "score"  # float for word-word edges, None for epsilon routing edges
 
 
 def build_bipartite_graph(
