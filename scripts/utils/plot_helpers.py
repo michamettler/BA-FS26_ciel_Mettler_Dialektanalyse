@@ -123,6 +123,8 @@ def plot_reduced_bipartite_graph_with_matching(
     # classify edges
     matching_edges = _get_bipartite_edges(M)
     source_sink_edges = _get_source_edges(M) + _get_sink_edges(M)
+    eps_edges = _get_epsilon_edges(M, matching_edges)
+    word_edges = _get_word_edges(M, matching_edges)
 
     # --- draw ---
     fig, ax = plt.subplots(figsize=(12, N * 0.5 + 1.5))
@@ -130,10 +132,6 @@ def plot_reduced_bipartite_graph_with_matching(
     # source/sink edges: s -> ref, hyp -> t (thin, gray, straight)
     nx.draw_networkx_edges(M, pos, edgelist=source_sink_edges, ax=ax,
                            edge_color=_COLOR_EDGE_GRAY, width=1.0, style="-", alpha=0.6)
-
-    # matching edges: routed as horizontal–diagonal–horizontal
-    eps_edges = _get_epsilon_edges(M, matching_edges)
-    word_edges = _get_word_edges(M, matching_edges)
 
     stub_len = 0.15  # length of horizontal stub from each node
 
@@ -238,9 +236,9 @@ def _build_reduced_graph(G: nx.DiGraph, matching: dict[str, str]) -> nx.DiGraph:
         if is_ref_eps and is_hyp_eps:
             continue
 
-        M.add_node(ref_node, label=G.nodes[ref_node][ATTR_WORD], partition=REFERENCE_PARTITION)
+        M.add_node(ref_node, word=G.nodes[ref_node][ATTR_WORD], label=G.nodes[ref_node][ATTR_WORD], partition=REFERENCE_PARTITION)
         M.add_edge(SOURCE_NODE, ref_node, score=None)
-        M.add_node(hyp_node, label=G.nodes[hyp_node][ATTR_WORD], partition=HYPOTHESIS_PARTITION)
+        M.add_node(hyp_node, word=G.nodes[hyp_node][ATTR_WORD], label=G.nodes[hyp_node][ATTR_WORD], partition=HYPOTHESIS_PARTITION)
         M.add_edge(hyp_node, SINK_NODE, score=None)
 
         score = G.edges[ref_node, hyp_node].get(ATTR_SCORE, 0)
