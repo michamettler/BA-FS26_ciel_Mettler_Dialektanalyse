@@ -1,117 +1,88 @@
 """
 Cross-comparison logic for word-level dialect analysis.
+
+Naive baseline approach: compares every reference word against every hypothesis word
+(exhaustive O(n×m) cross-comparison without 1:1 alignment constraint).
 """
 
 import pandas as pd
 
-from domain.models import WordSimilarity
-from domain.calculations import (
-    clean,
-    calculate_levenshtein_distance,
-    normalize_levenshtein_distance,
-    calculate_position_similarity,
-    calculate_weighted_similarity,
-    calculate_harmonic_similarity,
+from models import CalculationParameters, WordSimilarity
+from preprocessing import clean_word
+from calculations import (
+    calculate_similarities_for_word_pair
 )
 
 
 def generate_cross_comparison_df(
-    df, global_max_word_length, global_max_sentence_length, alpha=0.5
-):
-    """Generates a DataFrame where each row corresponds to a comparison between a source word and a target word (DIT and DAT).
-    We compare each source word to every word in the target sentences (DIT and DAT) to capture all possible alignments,
-    not just same-index pairs, since word order can differ.
-    The calculated scores (Levenshtein similarity, position similarity, weighted and harmonic) allow us to analyze how closely
-    the DIT and DAT sentences match the source sentence at the word level, accounting for both lexical similarity and
-    positional alignment.
+        ref_words: list[str],
+        hyp_words: list[str],
+        calculation_parameters: CalculationParameters,
+) -> pd.DataFrame:
+    """Cross-compare every reference word against every hypothesis word.
+
+    For each (ref_word, hyp_word) pair, computes lexical similarity (Levenshtein),
+    positional similarity, and weighted similarity.
+
+    Args:
+        ref_words: list of reference words.
+        hyp_words: list of hypothesis words.
+        calculation_parameters: Matching configuration (alpha, normalization mode, max lengths).
+
+    Returns:
+        DataFrame with one row per (ref, hyp) word pair and their similarities.
     """
-    word_rows = []
+    similarities = _evaluate_all_pairs(ref_words, hyp_words, calculation_parameters)
 
-    for _, row in df.iterrows():
-        clip_id = row["path"]
-
-        # create list of words for source, DIT and DAT sentence & clean them
-        src_words = [clean(w) for w in str(row["sentence"]).split()]
-        dit_words = [clean(w) for w in str(row["DIT"]).split()]
-        dat_words = [clean(w) for w in str(row["DAT"]).split()]
-
-        n_src_words = len(src_words)  # number of words in source sentence
-        n_dit_words = len(dit_words)  # number of words in DIT target sentence
-        n_dat_words = len(dat_words)  # number of words in DAT target sentence
-
-        for i, src_word in enumerate(src_words):
-            dit_scores: list[WordSimilarity] = evaluate_scores(
-                alpha,
-                dit_words,
-                src_word,
-                i,
-                global_max_word_length,
-                global_max_sentence_length,
-            )
-            dat_scores: list[WordSimilarity] = evaluate_scores(
-                alpha,
-                dat_words,
-                src_word,
-                i,
-                global_max_word_length,
-                global_max_sentence_length,
+    rows = []
+    for i, ref_word in enumerate(ref_words):
+        for sim in similarities[i]:
+            rows.append(
+                {
+                    "ref_index": i,
+                    "hyp_index": sim.target_index,
+                    "ref_word": clean_word(ref_word),
+                    "hyp_word": sim.target_word,
+                    "word_similarity": sim.word_similarity,
+                    "position_similarity": sim.position_similarity,
+                    "similarity_weighted": sim.similarity_weighted,
+                }
             )
 
-            ## TODO this currently only works for sentences with same amount of words. Think about solution with epsilon's.
-            for dit, dat in zip(dit_scores, dat_scores):
-                word_rows.append(
-                    {
-                        "clip_id": clip_id,
-                        "src_word_index": i,
-                        "dit_word_index": dit.target_index,
-                        "dat_word_index": dat.target_index,
-                        "src_word": src_word,
-                        "dit_word": dit.target_word,
-                        "dat_word": dat.target_word,
-                        "dit_word_similarity": dit.word_similarity,
-                        "dat_word_similarity": dat.word_similarity,
-                        "position_similarity": dit.position_similarity,
-                        "dit_similarity_weighted": dit.similarity_weighted,
-                        "dit_similarity_harmonic": dit.similarity_harmonic,
-                        "dat_similarity_weighted": dat.similarity_weighted,
-                        "dat_similarity_harmonic": dat.similarity_harmonic,
-                        "src_len": n_src_words,
-                        "dit_len": n_dit_words,
-                        "dat_len": n_dat_words,
-                    }
-                )
-
-    return pd.DataFrame(word_rows)
+    return pd.DataFrame(rows)
 
 
-def evaluate_scores(
-    alpha, target_words, src_word, i, global_max_word_length, global_max_sentence_length
-):
-    """Compares src_word against every word in target_words.
-    Returns a list of WordSimilarity objects, one per target word.
-    i = source word index
-    j = target word index
+def _evaluate_all_pairs(
+        ref_words: list[str],
+        hyp_words: list[str],
+        calculation_parameters: CalculationParameters,
+) -> list[list[WordSimilarity]]:
+    """Compare every ref word against every hyp word.
     """
     results = []
-    for j, target_word in enumerate(target_words):
-        lev_distance = calculate_levenshtein_distance(src_word, target_word)
-        word_similarity = normalize_levenshtein_distance(
-            lev_distance, global_max_word_length
-        )
-        position_similarity = calculate_position_similarity(i, j, global_max_sentence_length)
-        similarity_weighted = calculate_weighted_similarity(
-            word_similarity, position_similarity, alpha
-        )
-        similarity_harmonic = calculate_harmonic_similarity(word_similarity, position_similarity)
+    for i, ref_word in enumerate(ref_words):
+        ref_word_cleaned = clean_word(ref_word)
+        pair_results = []
+        for j, hyp_word in enumerate(hyp_words):
+            hyp_word_cleaned = clean_word(hyp_word)
 
-        word_sim = WordSimilarity(
-            j,
-            target_word,
-            word_similarity,
-            position_similarity,
-            similarity_weighted,
-            similarity_harmonic,
-        )
+            similarity_weighted, word_similarity, position_similarity = (
+                calculate_similarities_for_word_pair(
+                    ref_word=ref_word_cleaned,
+                    ref_position=i,
+                    hyp_word=hyp_word_cleaned,
+                    hyp_position=j,
+                    calculation_parameters=calculation_parameters,
+                ))
 
-        results.append(word_sim)
+            pair_results.append(
+                WordSimilarity(
+                    target_index=j,
+                    target_word=hyp_word_cleaned,
+                    word_similarity=word_similarity,
+                    position_similarity=position_similarity,
+                    similarity_weighted=similarity_weighted,
+                )
+            )
+        results.append(pair_results)
     return results
