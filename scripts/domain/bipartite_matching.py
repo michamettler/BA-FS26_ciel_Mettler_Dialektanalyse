@@ -139,6 +139,7 @@ def build_full_bipartite_graph(
 
 def solve_matching(G: nx.DiGraph) -> dict[str, str]:
     """Solve the min-cost max-flow problem on the given bipartite graph to find the optimal matching.
+    Solving by network simplex algorithm.
 
     Args:
         G: A NetworkX directed graph representing the bipartite flow network.
