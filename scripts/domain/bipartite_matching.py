@@ -233,7 +233,6 @@ def is_eps_node(attrs) -> bool:
 def get_nodes_by_partition(graph: nx.DiGraph, partition: str) -> list[str]:
     return [str(node) for node, attrs in graph.nodes(data=True)
             if attrs.get(ATTR_PARTITION) == partition]
-
 def get_source_edges(graph: nx.DiGraph) -> list[tuple[str, str]]:
     return [(u, v) for u, v in graph.edges() if u == SOURCE_NODE]
 
