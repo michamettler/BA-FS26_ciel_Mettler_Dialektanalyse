@@ -11,7 +11,7 @@ from bipartite_matching import (
     ATTR_WORD,
     ATTR_PARTITION,
     ATTR_LABEL,
-    ATTR_SCORE,
+    ATTR_SIMILARITY,
     build_reduced_graph_by_matching,
     extract_index_from_node_name,
     is_eps_node,
@@ -163,44 +163,44 @@ def plot_reduced_bipartite_graph_with_matching(
         draw_hdh_edge(pos[u], pos[v], _COLOR_EDGE_GRAY, 1.2, "--", 0.6)
 
     for u, v in word_edges:
-        score = M.edges[u, v][ATTR_SCORE]
-        draw_hdh_edge(pos[u], pos[v], cmap(score), 2.5, "-", 1.0)
+        similarity = M.edges[u, v][ATTR_SIMILARITY]
+        draw_hdh_edge(pos[u], pos[v], cmap(similarity), 2.5, "-", 1.0)
 
     # draw nodes ON TOP of edges so start/end points are clearly visible
     nx.draw_networkx_nodes(M, pos, ax=ax, node_size=node_sizes, node_color=node_colors,
                            edgecolors=_COLOR_NODE_BORDER, linewidths=1.0)
     nx.draw_networkx_labels(M, pos, labels=labels, ax=ax, font_size=9, font_weight="bold")
 
-    # score labels on word -> word edges - on the horizontal stub near the ref node
+    # similarity labels on word -> word edges - on the horizontal stub near the ref node
     for u, v in word_edges:
-        score = M.edges[u, v][ATTR_SCORE]
-        if score is None:
+        similarity = M.edges[u, v][ATTR_SIMILARITY]
+        if similarity is None:
             continue
         label_x = pos[u][0] + stub_len * 0.7  # towards the end of the horizontal stub
         label_y = pos[u][1]
-        ax.text(label_x, label_y, f"{score:.3f}", fontsize=7, ha="center", va="center",
+        ax.text(label_x, label_y, f"{similarity:.3f}", fontsize=7, ha="center", va="center",
                 color=_COLOR_SCORE_LABEL, zorder=5,
                 bbox=dict(boxstyle="round,pad=0.15", fc="white", ec="none", alpha=0.9))
 
     ax.set_title("Reduced Bipartite Flow Network (s -> R' -> H' -> t)", fontsize=14, pad=15)
     ax.axis("off")
 
-    # score colorbar (red=0 -> yellow=0.5 -> green=1)
+    # similarity colorbar (red=0 -> yellow=0.5 -> green=1)
     score_colorbar = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(0, 1))
     score_colorbar.set_array([])
-    fig.colorbar(score_colorbar, ax=ax, fraction=0.03, pad=0.04).set_label("Score", fontsize=10)
+    fig.colorbar(score_colorbar, ax=ax, fraction=0.03, pad=0.04).set_label("Similarity", fontsize=10)
 
     plt.tight_layout()
     plt.show()
 
 
-def plot_score_distribution(data, title):
-    """Plot a histogram of scores with a mean value indicated by a dashed line.
+def plot_similarity_distribution(data, title):
+    """Plot a histogram of similarities with a mean value indicated by a dashed line.
     """
     fig, ax = plt.subplots(figsize=(6, 4))
     ax.hist(data.dropna(), bins=50, color=_COLOR_HIST_BAR, edgecolor="white", linewidth=0.4)
     ax.set_title(title, fontsize=11)
-    ax.set_xlabel("Score (0 – 1)", fontsize=9)
+    ax.set_xlabel("Similarity (0 – 1)", fontsize=9)
     ax.set_ylabel("Count", fontsize=9)
     ax.xaxis.set_major_locator(mticker.MultipleLocator(0.2))
     ax.set_xlim(0, 1)

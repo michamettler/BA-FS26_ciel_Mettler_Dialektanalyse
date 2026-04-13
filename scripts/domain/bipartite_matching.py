@@ -13,7 +13,7 @@ HYPOTHESIS_PARTITION = "hyp"
 ATTR_WORD = "word"
 ATTR_PARTITION = "partition"
 ATTR_LABEL = "label"
-ATTR_SCORE = "score"  # float for word-word edges, None for epsilon routing edges
+ATTR_SIMILARITY = "similarity"  # float for word-word edges, None for epsilon routing edges
 
 
 def build_full_bipartite_graph(
@@ -27,7 +27,7 @@ def build_full_bipartite_graph(
     G = (R' ∪ H', E) with source s and sink t.
     Each partition is padded with epsilon-nodes so that both sides have N = n_r + n_h nodes,
     enabling a perfect matching where unmatched words flow through epsilon at a fixed penalty.
-    Edge weights represent cost = 1 - score (lower cost = better match).
+    Edge weights represent cost = 1 - similarity (lower cost = better match).
     All edge capacities are 1 (unit flow).
 
     Args:
@@ -91,7 +91,7 @@ def build_full_bipartite_graph(
                 get_node_name(HYPOTHESIS_PARTITION, j),
                 capacity=1,
                 weight=cost,
-                score=similarity,
+                similarity=similarity,
             )
     # edges from ref word nodes to hyp epsilon-nodes
     epsilon_cost = calculator.cost_for_epsilon_by_penalty()
@@ -102,7 +102,7 @@ def build_full_bipartite_graph(
                 get_node_name(HYPOTHESIS_PARTITION, k, eps=True),
                 capacity=1,
                 weight=epsilon_cost,
-                score=None,
+                similarity=None,
             )
 
     # edges from ref epsilon-nodes to hyp word nodes
@@ -113,14 +113,14 @@ def build_full_bipartite_graph(
                 get_node_name(HYPOTHESIS_PARTITION, k),
                 capacity=1,
                 weight=epsilon_cost,
-                score=None,
+                similarity=None,
             )
     # edges from ref epsilon-nodes to hyp epsilon-nodes
     for j in range(n_h):
         for i in range(n_r):
             G.add_edge(get_node_name(REFERENCE_PARTITION, j, eps=True),
                        get_node_name(HYPOTHESIS_PARTITION, i, eps=True),
-                       capacity=1, weight=0, score=None)
+                       capacity=1, weight=0, similarity=None)
 
     # edges from H' to t
     for i in range(n_r):
@@ -179,13 +179,13 @@ def build_reduced_graph_by_matching(G: nx.DiGraph, matching: dict[str, str]) -> 
 
         M.add_node(r, word=G.nodes[r][ATTR_WORD], label=G.nodes[r][ATTR_WORD],
                    partition=REFERENCE_PARTITION)
-        M.add_edge(SOURCE_NODE, r, score=None)
+        M.add_edge(SOURCE_NODE, r, similarity=None)
         M.add_node(h, word=G.nodes[h][ATTR_WORD], label=G.nodes[h][ATTR_WORD],
                    partition=HYPOTHESIS_PARTITION)
-        M.add_edge(h, SINK_NODE, score=None)
+        M.add_edge(h, SINK_NODE, similarity=None)
 
-        score = G.edges[r, h].get(ATTR_SCORE)
-        M.add_edge(r, h, score=score)
+        similarity = G.edges[r, h].get(ATTR_SIMILARITY)
+        M.add_edge(r, h, similarity=similarity)
 
     return M
 
