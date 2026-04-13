@@ -1,7 +1,7 @@
 import networkx as nx
 
 from calculations import (
-    calculate_similarity_for_word_pair_by_weighted_lexical_and_positional_similarities,
+    calculate_similarities_for_word_pair,
     calculate_cost_for_word_pair_by_similarity,
     calculate_cost_for_epsilon_by_penalty,
 )
@@ -83,7 +83,7 @@ def build_full_bipartite_graph(
             ref_word = clean_word(ref_words[i])
             hyp_word = clean_word(hyp_words[j])
 
-            similarity = calculate_similarity_for_word_pair_by_weighted_lexical_and_positional_similarities(
+            similarity, _, _ = calculate_similarities_for_word_pair(
                 ref_word=ref_word,
                 ref_position=i,
                 hyp_word=hyp_word,
@@ -235,6 +235,8 @@ def is_eps_node(attrs) -> bool:
 def get_nodes_by_partition(graph: nx.DiGraph, partition: str) -> list[str]:
     return [str(node) for node, attrs in graph.nodes(data=True)
             if attrs.get(ATTR_PARTITION) == partition]
+
+
 def get_source_edges(graph: nx.DiGraph) -> list[tuple[str, str]]:
     return [(u, v) for u, v in graph.edges() if u == SOURCE_NODE]
 

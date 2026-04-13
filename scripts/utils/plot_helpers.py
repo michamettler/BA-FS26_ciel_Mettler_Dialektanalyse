@@ -217,7 +217,7 @@ def plot_score_distribution(data, title):
         color=_COLOR_HIST_MEAN,
         linewidth=1.2,
         linestyle="--",
-        label=f"Mean: {mean_val:.3f}",
+        label=f"Mean: {mean_val:.5f}",
     )
     ax.legend(fontsize=8)
     plt.tight_layout()

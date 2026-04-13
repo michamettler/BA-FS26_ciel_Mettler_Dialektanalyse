@@ -10,19 +10,15 @@ import Levenshtein
 _COST_SCALE = 1000
 
 
-def calculate_similarity_for_word_pair_by_weighted_lexical_and_positional_similarities(
+def calculate_similarities_for_word_pair(
         ref_word: str,
         ref_position: int,
         hyp_word: str,
         hyp_position: int,
         calculation_parameters: CalculationParameters,
-) -> float:
+) -> tuple[float, float, float]:
     """Calculate the similarity score between two words based on lexical and positional similarity.
-
-    Lexical similarity is computed via Levenshtein distance (normalized globally or locally).
-    Positional similarity is based on the distance of word positions in their respective sentences,
-    normalized by the global maximum sentence length.
-    The two are combined into a single similarity using a weighted average (alpha).
+    Lexical and positional similarities are combined into a single similarity using a weighted average (alpha).
 
     Args:
         ref_word: The reference word for comparison.
@@ -32,7 +28,10 @@ def calculate_similarity_for_word_pair_by_weighted_lexical_and_positional_simila
         calculation_parameters: Matching configuration (alpha, normalization mode, max lengths).
 
     Returns:
-        Similarity in [0.0, 1.0]. Higher means a better match.
+        A tuple of (combined_similarity, word_similarity, position_similarity), where:
+        - combined_similarity: Weighted average of lexical and positional similarity in [0.0, 1.0].
+        - word_similarity: Lexical similarity in [0.0, 1.0].
+        - position_similarity: Positional similarity in [0.0, 1.0].
     """
     # Calculate word similarity (lexical similarity) using Levenshtein distance, normalized either globally or locally. TODO also levels?
     if calculation_parameters.use_global_levenshtein_normalization:
@@ -54,7 +53,11 @@ def calculate_similarity_for_word_pair_by_weighted_lexical_and_positional_simila
     )
 
     # Combine lexical and positional similarity into a single similarity using a weighted average.
-    return calculate_weighted_similarity(word_similarity, position_similarity, alpha=calculation_parameters.alpha)
+    return (
+        calculate_weighted_similarity(word_similarity, position_similarity, alpha=calculation_parameters.alpha),
+        word_similarity,
+        position_similarity
+    )
 
 
 def calculate_cost_for_word_pair_by_similarity(similarity: float) -> int:
@@ -89,6 +92,7 @@ def calculate_weighted_similarity(
         word_similarity: float, position_similarity: float, alpha=0.5
 ) -> float:
     """Compute weighted average of lexical and positional similarity.
+    alpha * word_similarity + (1 - alpha) * position_similarity
 
     Args:
         word_similarity: Lexical similarity in [0.0, 1.0].
@@ -101,24 +105,6 @@ def calculate_weighted_similarity(
     return alpha * word_similarity + (1 - alpha) * position_similarity
 
 
-def calculate_harmonic_similarity(word_similarity: float, position_similarity: float) -> float:
-    """Compute harmonic mean (F1-style) of lexical and positional similarity.
-
-    Penalizes pairs where either similarity is low.
-    Based on: van Rijsbergen (1979). Information Retrieval. Butterworths.
-
-    Args:
-        word_similarity: Lexical similarity in [0.0, 1.0].
-        position_similarity: Positional similarity in [0.0, 1.0].
-
-    Returns:
-        Harmonic mean in [0.0, 1.0]. Higher means a better match.
-    """
-    if word_similarity + position_similarity == 0:
-        return 0.0
-    return 2 * word_similarity * position_similarity / (word_similarity + position_similarity)
-
-
 # -- Helper functions --
 
 def _calculate_word_similarity_global(
@@ -128,14 +114,7 @@ def _calculate_word_similarity_global(
 
     Normalization is based on global_max_word_length to achieve comparable similarities
     across the dataset.
-
-    Args:
-        ref_word: Reference word.
-        hyp_word: Hypothesis word to compare against.
-        global_max_word_length: Globally known maximum word length for normalization.
-
-    Returns:
-        Similarity in [0.0, 1.0]. Higher means more similar.
+    similarity = 1 - (distance / global_max_word_length).
     """
     distance = Levenshtein.distance(ref_word, hyp_word)
 
@@ -155,13 +134,6 @@ def _calculate_word_similarity_local(ref_word: str, hyp_word: str) -> float:
 
     Delegates to python-Levenshtein's ratio:
     similarity = (len(ref) + len(hyp) - distance) / (len(ref) + len(hyp)).
-
-    Args:
-        ref_word: Reference word.
-        hyp_word: Hypothesis word to compare against.
-
-    Returns:
-        Similarity in [0.0, 1.0]. Higher means more similar.
     """
     return Levenshtein.ratio(ref_word, hyp_word)
 
@@ -173,14 +145,6 @@ def _calculate_position_similarity(
 
     Returns 1.0 if positions are identical, 0.0 if the gap is maximal relative
     to the global maximum sentence length.
-
-    Args:
-        ref_index: Position of the reference word in its sentence.
-        hyp_index: Position of the hypothesis word in its sentence.
-        global_max_sentence_length: Globally known maximum sentence length for normalization.
-
-    Returns:
-        Position similarity in [0.0, 1.0]. Higher means closer positions.
     """
     if global_max_sentence_length > 1:
         distance_to_hyp_word = abs(ref_index - hyp_index)

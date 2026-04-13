@@ -50,4 +50,3 @@ class WordSimilarity:
     word_similarity: float
     position_similarity: float
     similarity_weighted: float
-    similarity_harmonic: float
