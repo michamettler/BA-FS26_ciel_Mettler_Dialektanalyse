@@ -7,32 +7,27 @@ Naive baseline approach: compares every reference word against every hypothesis 
 
 import pandas as pd
 
-from models import CalculationParameters, WordSimilarity
+from models import WordSimilarity
 from preprocessing import clean_word
-from calculations import (
-    calculate_similarities_for_word_pair
-)
+from word_similarity_calculator import WordSimilarityCalculator
 
 
 def generate_cross_comparison_df(
         ref_words: list[str],
         hyp_words: list[str],
-        calculation_parameters: CalculationParameters,
+        calculator: WordSimilarityCalculator,
 ) -> pd.DataFrame:
     """Cross-compare every reference word against every hypothesis word.
-
-    For each (ref_word, hyp_word) pair, computes lexical similarity (Levenshtein),
-    positional similarity, and weighted similarity.
 
     Args:
         ref_words: list of reference words.
         hyp_words: list of hypothesis words.
-        calculation_parameters: Matching configuration (alpha, normalization mode, max lengths).
+        calculator: WordSimilarityCalculator instance for computing similarities.
 
     Returns:
         DataFrame with one row per (ref, hyp) word pair and their similarities.
     """
-    similarities = _evaluate_all_pairs(ref_words, hyp_words, calculation_parameters)
+    similarities = _evaluate_all_pairs(ref_words, hyp_words, calculator)
 
     rows = []
     for i, ref_word in enumerate(ref_words):
@@ -44,8 +39,8 @@ def generate_cross_comparison_df(
                     "hyp_index": sim.target_index,
                     "ref_word": ref_word_cleaned,
                     "hyp_word": sim.target_word,
-                    "word_similarity": sim.word_similarity,
-                    "position_similarity": sim.position_similarity,
+                    "word_similarity": sim.lexical_similarity,
+                    "position_similarity": sim.positional_similarity,
                     "similarity_weighted": sim.similarity_weighted,
                 }
             )
@@ -56,7 +51,7 @@ def generate_cross_comparison_df(
 def _evaluate_all_pairs(
         ref_words: list[str],
         hyp_words: list[str],
-        calculation_parameters: CalculationParameters,
+        calculator: WordSimilarityCalculator,
 ) -> list[list[WordSimilarity]]:
     """Compare every ref word against every hyp word.
     """
@@ -67,21 +62,20 @@ def _evaluate_all_pairs(
         for j, hyp_word in enumerate(hyp_words):
             hyp_word_cleaned = clean_word(hyp_word)
 
-            similarity_weighted, word_similarity, position_similarity = (
-                calculate_similarities_for_word_pair(
+            similarity_weighted, lexical_similarity, positional_similarity = (
+                calculator.combined_weighted_similarities(
                     ref_word=ref_word_cleaned,
                     ref_position=i,
                     hyp_word=hyp_word_cleaned,
                     hyp_position=j,
-                    calculation_parameters=calculation_parameters,
                 ))
 
             pair_results.append(
                 WordSimilarity(
                     target_index=j,
                     target_word=hyp_word_cleaned,
-                    word_similarity=word_similarity,
-                    position_similarity=position_similarity,
+                    lexical_similarity=lexical_similarity,
+                    positional_similarity=positional_similarity,
                     similarity_weighted=similarity_weighted,
                 )
             )

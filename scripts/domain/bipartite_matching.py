@@ -1,11 +1,6 @@
 import networkx as nx
 
-from calculations import (
-    calculate_similarities_for_word_pair,
-    calculate_cost_for_word_pair_by_similarity,
-    calculate_cost_for_epsilon_by_penalty,
-)
-from models import CalculationParameters
+from word_similarity_calculator import WordSimilarityCalculator, cost_for_word_pair_by_similarity
 from preprocessing import clean_word
 
 EPS = "ε"  # epsilon symbol, used for unmatched padding nodes
@@ -24,7 +19,7 @@ ATTR_SCORE = "score"  # float for word-word edges, None for epsilon routing edge
 def build_full_bipartite_graph(
         ref_words: list[str],
         hyp_words: list[str],
-        calculation_parameters: CalculationParameters,
+        calculator: WordSimilarityCalculator,
 ) -> nx.DiGraph:
     """Build a weighted bipartite flow network between reference and hypothesis words.
 
@@ -38,7 +33,7 @@ def build_full_bipartite_graph(
     Args:
         ref_words: List of words in the reference sentence.
         hyp_words: List of words in the hypothesis sentence.
-        calculation_parameters: Matching configuration (alpha, lambda_, normalization mode, max lengths).
+        calculator: WordSimilarityCalculator instance for computing similarities and costs.
 
     Returns:
         A NetworkX directed graph representing the bipartite flow network with nodes and edges as described above.
@@ -83,14 +78,13 @@ def build_full_bipartite_graph(
             ref_word = clean_word(ref_words[i])
             hyp_word = clean_word(hyp_words[j])
 
-            similarity, _, _ = calculate_similarities_for_word_pair(
+            similarity, _, _ = calculator.combined_weighted_similarities(
                 ref_word=ref_word,
                 ref_position=i,
                 hyp_word=hyp_word,
                 hyp_position=j,
-                calculation_parameters=calculation_parameters,
             )
-            cost = calculate_cost_for_word_pair_by_similarity(similarity)
+            cost = cost_for_word_pair_by_similarity(similarity)
 
             G.add_edge(
                 get_node_name(REFERENCE_PARTITION, i),
@@ -100,7 +94,7 @@ def build_full_bipartite_graph(
                 score=similarity,
             )
     # edges from ref word nodes to hyp epsilon-nodes
-    epsilon_cost = calculate_cost_for_epsilon_by_penalty(calculation_parameters.lambda_)
+    epsilon_cost = calculator.cost_for_epsilon_by_penalty()
     for i in range(n_r):
         for k in range(n_r):
             G.add_edge(
