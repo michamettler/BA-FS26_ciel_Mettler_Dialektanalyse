@@ -1,11 +1,6 @@
 import networkx as nx
 
-from calculations import (
-    calculate_similarities_for_word_pair,
-    calculate_cost_for_word_pair_by_similarity,
-    calculate_cost_for_epsilon_by_penalty,
-)
-from models import CalculationParameters
+from word_similarity_calculator import WordSimilarityCalculator, cost_for_word_pair_by_similarity
 from preprocessing import clean_word
 
 EPS = "ε"  # epsilon symbol, used for unmatched padding nodes
@@ -18,13 +13,13 @@ HYPOTHESIS_PARTITION = "hyp"
 ATTR_WORD = "word"
 ATTR_PARTITION = "partition"
 ATTR_LABEL = "label"
-ATTR_SCORE = "score"  # float for word-word edges, None for epsilon routing edges
+ATTR_SIMILARITY = "similarity"  # float for word-word edges, None for epsilon routing edges
 
 
 def build_full_bipartite_graph(
         ref_words: list[str],
         hyp_words: list[str],
-        calculation_parameters: CalculationParameters,
+        calculator: WordSimilarityCalculator,
 ) -> nx.DiGraph:
     """Build a weighted bipartite flow network between reference and hypothesis words.
 
@@ -32,13 +27,13 @@ def build_full_bipartite_graph(
     G = (R' ∪ H', E) with source s and sink t.
     Each partition is padded with epsilon-nodes so that both sides have N = n_r + n_h nodes,
     enabling a perfect matching where unmatched words flow through epsilon at a fixed penalty.
-    Edge weights represent cost = 1 - score (lower cost = better match).
+    Edge weights represent cost = 1 - similarity (lower cost = better match).
     All edge capacities are 1 (unit flow).
 
     Args:
         ref_words: List of words in the reference sentence.
         hyp_words: List of words in the hypothesis sentence.
-        calculation_parameters: Matching configuration (alpha, lambda_, normalization mode, max lengths).
+        calculator: WordSimilarityCalculator instance for computing similarities and costs.
 
     Returns:
         A NetworkX directed graph representing the bipartite flow network with nodes and edges as described above.
@@ -83,24 +78,23 @@ def build_full_bipartite_graph(
             ref_word = clean_word(ref_words[i])
             hyp_word = clean_word(hyp_words[j])
 
-            similarity, _, _ = calculate_similarities_for_word_pair(
+            similarity = calculator.combined_weighted_similarity(
                 ref_word=ref_word,
                 ref_position=i,
                 hyp_word=hyp_word,
                 hyp_position=j,
-                calculation_parameters=calculation_parameters,
             )
-            cost = calculate_cost_for_word_pair_by_similarity(similarity)
+            cost = cost_for_word_pair_by_similarity(similarity)
 
             G.add_edge(
                 get_node_name(REFERENCE_PARTITION, i),
                 get_node_name(HYPOTHESIS_PARTITION, j),
                 capacity=1,
                 weight=cost,
-                score=similarity,
+                similarity=similarity,
             )
     # edges from ref word nodes to hyp epsilon-nodes
-    epsilon_cost = calculate_cost_for_epsilon_by_penalty(calculation_parameters.lambda_)
+    epsilon_cost = calculator.cost_for_epsilon_by_penalty()
     for i in range(n_r):
         for k in range(n_r):
             G.add_edge(
@@ -108,7 +102,7 @@ def build_full_bipartite_graph(
                 get_node_name(HYPOTHESIS_PARTITION, k, eps=True),
                 capacity=1,
                 weight=epsilon_cost,
-                score=None,
+                similarity=None,
             )
 
     # edges from ref epsilon-nodes to hyp word nodes
@@ -119,14 +113,14 @@ def build_full_bipartite_graph(
                 get_node_name(HYPOTHESIS_PARTITION, k),
                 capacity=1,
                 weight=epsilon_cost,
-                score=None,
+                similarity=None,
             )
     # edges from ref epsilon-nodes to hyp epsilon-nodes
     for j in range(n_h):
         for i in range(n_r):
             G.add_edge(get_node_name(REFERENCE_PARTITION, j, eps=True),
                        get_node_name(HYPOTHESIS_PARTITION, i, eps=True),
-                       capacity=1, weight=0, score=None)
+                       capacity=1, weight=0, similarity=None)
 
     # edges from H' to t
     for i in range(n_r):
@@ -151,10 +145,10 @@ def solve_matching(G: nx.DiGraph) -> dict[str, str]:
 
     # Extract matching: for each node r in R', find the matched node h in H' with flow=1
     matching = {}
-    for w, neighbors in flow_dict.items():
-        for v, flow in neighbors.items():
-            if flow == 1 and G.nodes[v].get(ATTR_PARTITION) == HYPOTHESIS_PARTITION:
-                matching[w] = v
+    for r, neighbors in flow_dict.items():
+        for h, flow in neighbors.items():
+            if flow == 1 and G.nodes[h].get(ATTR_PARTITION) == HYPOTHESIS_PARTITION:
+                matching[r] = h
     return matching
 
 
@@ -177,21 +171,21 @@ def build_reduced_graph_by_matching(G: nx.DiGraph, matching: dict[str, str]) -> 
     M.add_node(SOURCE_NODE, label=SOURCE_NODE)
     M.add_node(SINK_NODE, label=SINK_NODE)
 
-    for ref_node, hyp_node in matching.items():
-        is_ref_eps = is_eps_node(G.nodes[ref_node])
-        is_hyp_eps = is_eps_node(G.nodes[hyp_node])
+    for r, h in matching.items():
+        is_ref_eps = is_eps_node(G.nodes[r])
+        is_hyp_eps = is_eps_node(G.nodes[h])
         if is_ref_eps and is_hyp_eps:
             continue
 
-        M.add_node(ref_node, word=G.nodes[ref_node][ATTR_WORD], label=G.nodes[ref_node][ATTR_WORD],
+        M.add_node(r, word=G.nodes[r][ATTR_WORD], label=G.nodes[r][ATTR_WORD],
                    partition=REFERENCE_PARTITION)
-        M.add_edge(SOURCE_NODE, ref_node, score=None)
-        M.add_node(hyp_node, word=G.nodes[hyp_node][ATTR_WORD], label=G.nodes[hyp_node][ATTR_WORD],
+        M.add_edge(SOURCE_NODE, r, similarity=None)
+        M.add_node(h, word=G.nodes[h][ATTR_WORD], label=G.nodes[h][ATTR_WORD],
                    partition=HYPOTHESIS_PARTITION)
-        M.add_edge(hyp_node, SINK_NODE, score=None)
+        M.add_edge(h, SINK_NODE, similarity=None)
 
-        score = G.edges[ref_node, hyp_node].get(ATTR_SCORE)
-        M.add_edge(ref_node, hyp_node, score=score)
+        similarity = G.edges[r, h].get(ATTR_SIMILARITY)
+        M.add_edge(r, h, similarity=similarity)
 
     return M
 
