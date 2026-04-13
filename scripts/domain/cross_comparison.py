@@ -75,7 +75,7 @@ def _evaluate_all_pairs(
 
             lexical_similarity = calculator.lexical_similarity(ref_word_cleaned, hyp_word_cleaned)
             positional_similarity = calculator.positional_similarity(i, j)
-            similarity_weighted = calculator.combined_weighted_similarity(
+            similarity_weighted = calculator.combined_weighted_lexical_positional_similarity(
                     ref_word=ref_word_cleaned,
                     ref_position=i,
                     hyp_word=hyp_word_cleaned,

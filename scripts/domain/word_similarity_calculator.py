@@ -51,7 +51,7 @@ class WordSimilarityCalculator:
         self.use_global_lexical_normalization = use_global_lexical_normalization
         self.max_word_len = max_word_len
 
-    def combined_weighted_similarity(
+    def combined_weighted_lexical_positional_similarity(
             self,
             ref_word: str,
             ref_position: int,
