@@ -29,8 +29,8 @@ def build_bipartite_graph(
 
     The alignment is modeled as finding the min-cost max-flow in a bipartite network
     G = (R' ∪ H', E) with source s and sink t.
-    Each partition is padded with ε-nodes so that both sides have N = n_r + n_h nodes,
-    enabling a perfect matching where unmatched words flow through ε at a fixed penalty.
+    Each partition is padded with epsilon-nodes so that both sides have N = n_r + n_h nodes,
+    enabling a perfect matching where unmatched words flow through epsilon at a fixed penalty.
     Edge weights represent cost = 1 - score (lower cost = better match).
     All edge capacities are 1 (unit flow).
 
@@ -46,8 +46,8 @@ def build_bipartite_graph(
     # --- Graph ---
     G = nx.DiGraph()
 
-    n_r = len(ref_words)  # |R|, reference word count / number of ε-nodes in H'
-    n_h = len(hyp_words)  # |H|, hypothesis word count / number of ε-nodes in R'
+    n_r = len(ref_words)  # |R|, reference word count / number of epsilon-nodes in H'
+    n_h = len(hyp_words)  # |H|, hypothesis word count / number of epsilon-nodes in R'
     N = n_r + n_h  # padded partition size
 
     # --- Nodes ---
@@ -98,7 +98,7 @@ def build_bipartite_graph(
                 weight=cost,
                 score=similarity,
             )
-    # edges from ref word nodes to hyp ε-nodes
+    # edges from ref word nodes to hyp epsilon-nodes
     for i in range(n_r):
         for k in range(n_r):
             similarity = 1 - calculation_parameters.lambda_
@@ -112,7 +112,7 @@ def build_bipartite_graph(
                 score=similarity,
             )
 
-    # edges from ref ε-nodes to hyp word nodes
+    # edges from ref epsilon-nodes to hyp word nodes
     for j in range(n_h):
         for k in range(n_h):
             similarity = 1 - calculation_parameters.lambda_
@@ -125,7 +125,7 @@ def build_bipartite_graph(
                 weight=cost,
                 score=similarity,
             )
-    # edges from ref ε-nodes to hyp ε-nodes
+    # edges from ref epsilon-nodes to hyp epsilon-nodes
     for j in range(n_h):
         for i in range(n_r):
             G.add_edge(_get_node_name(REFERENCE_PARTITION, j, eps=True),

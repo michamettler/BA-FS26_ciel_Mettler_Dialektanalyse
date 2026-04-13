@@ -44,22 +44,22 @@ def plot_bipartite_graph_full(
 ):
     """Plot the full bipartite flow network (all edges, before matching) using NetworkX.
 
-    Shows the complete graph structure: s → R' (all edges) → H' (all edges) → t,
+    Shows the complete graph structure: s -> R' (all edges) -> H' (all edges) -> t,
     including all possible connections.
 
     Args:
         G: Full flow network.
     """
-    # --- collect nodes by partition & build layout ---
+    # collect nodes by partition & build layout
     ref_nodes = _collect_and_sort_nodes_by_partition(G, REFERENCE_PARTITION)
     hyp_nodes = _collect_and_sort_nodes_by_partition(G, HYPOTHESIS_PARTITION)
 
     pos, N = _build_layout(ref_nodes, hyp_nodes)
 
-    # --- node styling ---
+    # node styling
     labels, node_colors, node_sizes = _get_style_for_nodes(G)
 
-    # --- classify edges ---
+    # classify edges
     source_edges = _get_source_edges(G)
     sink_edges = _get_sink_edges(G)
     bipartite_edges = _get_bipartite_edges(G)
@@ -72,17 +72,17 @@ def plot_bipartite_graph_full(
                            edgecolors=_COLOR_NODE_BORDER, linewidths=1.0)
     nx.draw_networkx_labels(G, pos, labels=labels, ax=ax, font_size=9, font_weight="bold")
 
-    # s → R' edges (gray)
+    # s -> R' edges (gray)
     nx.draw_networkx_edges(G, pos, edgelist=source_edges, ax=ax,
                            edge_color=_COLOR_EDGE_GRAY, width=0.8, alpha=0.5,
                            connectionstyle="arc3,rad=0.0")
 
-    # H' → t edges (gray)
+    # H' -> t edges (gray)
     nx.draw_networkx_edges(G, pos, edgelist=sink_edges, ax=ax,
                            edge_color=_COLOR_EDGE_GRAY, width=0.8, alpha=0.5,
                            connectionstyle="arc3,rad=0.0")
 
-    # R' → H' bipartite edges (light blue, thin)
+    # R' -> H' bipartite edges (light blue, thin)
     nx.draw_networkx_edges(G, pos, edgelist=bipartite_edges, ax=ax,
                            edge_color=_COLOR_EDGE_BIPARTITE, width=0.5, alpha=0.3,
                            connectionstyle="arc3,rad=0.0")
@@ -132,8 +132,8 @@ def plot_reduced_bipartite_graph_with_matching(
                            edge_color=_COLOR_EDGE_GRAY, width=1.0, style="-", alpha=0.6)
 
     # matching edges: routed as horizontal–diagonal–horizontal
-    eps_edges = [(u, v) for u, v in matching_edges if EPS in str(u) or EPS in str(v)]
-    word_edges = [(u, v) for u, v in matching_edges if EPS not in str(u) and EPS not in str(v)]
+    eps_edges = _get_epsilon_edges(M, matching_edges)
+    word_edges = _get_word_edges(M, matching_edges)
 
     stub_len = 0.15  # length of horizontal stub from each node
 
@@ -158,16 +158,17 @@ def plot_reduced_bipartite_graph_with_matching(
     nx.draw_networkx_labels(M, pos, labels=labels, ax=ax, font_size=9, font_weight="bold")
 
     # score labels on word -> word edges - on the horizontal stub near the ref node
-    scored_edges = [(u, v, attrs[ATTR_SCORE]) for u, v, attrs in M.edges(data=True)
-                    if attrs[ATTR_SCORE] is not None and EPS not in u and EPS not in v]
-    for u, v, score in scored_edges:
+    for u, v in word_edges:
+        score = M.edges[u, v][ATTR_SCORE]
+        if score is None:
+            continue
         label_x = pos[u][0] + stub_len * 0.7  # towards the end of the horizontal stub
         label_y = pos[u][1]
         ax.text(label_x, label_y, f"{score:.3f}", fontsize=7, ha="center", va="center",
                 color=_COLOR_SCORE_LABEL, zorder=5,
                 bbox=dict(boxstyle="round,pad=0.15", fc="white", ec="none", alpha=0.9))
 
-    ax.set_title("Reduced Bipartite Flow Network (s → R' → H' → t)", fontsize=14, pad=15)
+    ax.set_title("Reduced Bipartite Flow Network (s -> R' -> H' -> t)", fontsize=14, pad=15)
     ax.axis("off")
 
     # score colorbar (red=0 -> yellow=0.5 -> green=1)
@@ -209,15 +210,6 @@ def plot_score_distribution(data, title):
 # --- Helper Functions ---
 
 def _collect_and_sort_nodes_by_partition(graph: nx.DiGraph, partition: str) -> list[str]:
-    """Collect and sort nodes belonging to a given partition.
-
-    Args:
-        graph: A NetworkX directed graph with "partition" attributes on nodes.
-        partition: The partition value to filter by (e.g. REFERENCE_PARTITION or HYPOTHESIS_PARTITION).
-
-    Returns:
-        A sorted list of node names belonging to the given partition.
-    """
     nodes = [str(node) for node, attrs in graph.nodes(data=True)
              if attrs.get(ATTR_PARTITION) == partition]
     return sorted(nodes, key=_get_sort_key_for_node_order)
@@ -233,7 +225,7 @@ def _build_reduced_graph(G: nx.DiGraph, matching: dict[str, str]) -> nx.DiGraph:
         matching: Dict mapping each reference node to its matched hypothesis node.
 
     Returns:
-        A reduced NetworkX directed graph with s → ref → hyp → t edges for non-trivial matches.
+        A reduced NetworkX directed graph with s -> ref -> hyp -> t edges for non-trivial matches.
     """
     M = nx.DiGraph()
 
@@ -241,8 +233,8 @@ def _build_reduced_graph(G: nx.DiGraph, matching: dict[str, str]) -> nx.DiGraph:
     M.add_node(SINK_NODE, label=SINK_NODE)
 
     for ref_node, hyp_node in matching.items():
-        is_ref_eps = G.nodes[ref_node][ATTR_WORD] == EPS
-        is_hyp_eps = G.nodes[hyp_node][ATTR_WORD] == EPS
+        is_ref_eps = is_eps_node(G.nodes[ref_node])
+        is_hyp_eps = is_eps_node(G.nodes[hyp_node])
         if is_ref_eps and is_hyp_eps:
             continue
 
@@ -258,31 +250,15 @@ def _build_reduced_graph(G: nx.DiGraph, matching: dict[str, str]) -> nx.DiGraph:
 
 
 def _get_source_edges(graph: nx.DiGraph) -> list[tuple[str, str]]:
-    """Get all edges originating from the source node.
-
-    Args:
-        graph: A NetworkX directed graph with a source node.
-
-    Returns:
-        A list of (u, v) tuples for edges where u is the source node.
-    """
     return [(u, v) for u, v in graph.edges() if u == SOURCE_NODE]
 
 
 def _get_sink_edges(graph: nx.DiGraph) -> list[tuple[str, str]]:
-    """Get all edges leading into the sink node.
-
-    Args:
-        graph: A NetworkX directed graph with a sink node.
-
-    Returns:
-        A list of (u, v) tuples for edges where v is the sink node.
-    """
     return [(u, v) for u, v in graph.edges() if v == SINK_NODE]
 
 
 def _get_bipartite_edges(graph: nx.DiGraph) -> list[tuple[str, str]]:
-    """Get all edges between the reference and hypothesis partitions (ref → hyp).
+    """Get all edges between the reference and hypothesis partitions (ref -> hyp).
 
     Args:
         graph: A NetworkX directed graph with partition attributes on nodes.
@@ -293,6 +269,42 @@ def _get_bipartite_edges(graph: nx.DiGraph) -> list[tuple[str, str]]:
     return [(u, v) for u, v in graph.edges()
             if graph.nodes[u].get(ATTR_PARTITION) == REFERENCE_PARTITION
             and graph.nodes[v].get(ATTR_PARTITION) == HYPOTHESIS_PARTITION]
+
+
+def _get_word_edges(graph: nx.DiGraph, matching_edges: list[tuple[str, str]]) -> list[tuple[str, str]]:
+    """Extract word-level edges from a list of matching edges.
+
+    Filters out edges where either endpoint is an epsilon node.
+
+    Args:
+        graph: A NetworkX directed graph with "word" attributes on nodes.
+        matching_edges: A list of tuples, where each tuple represents an edge between two nodes.
+
+    Returns:
+        A list of tuples representing edges where neither node is an epsilon node.
+    """
+    return [(u, v) for u, v in matching_edges
+            if not is_eps_node(graph.nodes[u]) and not is_eps_node(graph.nodes[v])]
+
+
+def _get_epsilon_edges(graph: nx.DiGraph, matching_edges: list[tuple[str, str]]) -> list[tuple[str, str]]:
+    """Extract epsilon edges from a list of matching edges.
+
+    Returns only edges where at least one endpoint is an epsilon node.
+
+    Args:
+        graph: A NetworkX directed graph with "word" attributes on nodes.
+        matching_edges: A list of edges represented as tuples of strings.
+
+    Returns:
+        A list of edges where at least one node is an epsilon node.
+    """
+    return [(u, v) for u, v in matching_edges
+            if is_eps_node(graph.nodes[u]) or is_eps_node(graph.nodes[v])]
+
+
+def is_eps_node(attrs) -> bool:
+    return attrs.get(ATTR_WORD) == EPS
 
 
 def _build_layout(ref_nodes: list[str], hyp_nodes: list[str]) -> tuple[dict, int]:
@@ -320,7 +332,7 @@ def _build_layout(ref_nodes: list[str], hyp_nodes: list[str]) -> tuple[dict, int
 def _get_style_for_nodes(graph: nx.DiGraph) -> tuple[dict, list[str], list[int]]:
     """Compute labels, colors, and sizes for all nodes in a bipartite flow graph.
 
-    Node colors: gray for ε-nodes, partition color for ref/hyp word nodes,
+    Node colors: gray for epsilon-nodes, partition color for ref/hyp word nodes,
     and dedicated colors for source/sink.
 
     Args:
@@ -341,7 +353,7 @@ def _get_style_for_nodes(graph: nx.DiGraph) -> tuple[dict, list[str], list[int]]
             node_colors.append(_NODE_COLOR_MAP[node_str])
             node_sizes.append(1600)
         else:
-            if EPS in node_str:
+            if is_eps_node(attrs):
                 node_colors.append(_COLOR_NODE_EPS)
             else:
                 node_colors.append(_NODE_COLOR_MAP[attrs[ATTR_PARTITION]])
