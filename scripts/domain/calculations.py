@@ -71,6 +71,20 @@ def calculate_cost_for_word_pair_by_similarity(similarity: float) -> int:
     return round((1 - similarity) * _COST_SCALE)
 
 
+def calculate_cost_for_epsilon_by_penalty(penalty: float) -> int:
+    """Convert an epsilon penalty to an integer cost for the network flow algorithm.
+
+    Cost = penalty * _COST_SCALE, rounded to the nearest integer.
+
+    Args:
+        penalty: Penalty in [0.0, 1.0]. Higher means more costly to leave a word unmatched.
+
+    Returns:
+        Integer cost (0 = free epsilon routing, _COST_SCALE = maximum penalty).
+    """
+    return round(penalty * _COST_SCALE)
+
+
 def calculate_weighted_similarity(
         word_similarity: float, position_similarity: float, alpha=0.5
 ) -> float:
