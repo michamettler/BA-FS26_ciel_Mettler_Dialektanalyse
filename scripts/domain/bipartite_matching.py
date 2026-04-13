@@ -2,7 +2,8 @@ import networkx as nx
 
 from calculations import (
     calculate_similarity_for_word_pair_by_weighted_lexical_and_positional_similarities,
-    calculate_cost_for_word_pair_by_similarity
+    calculate_cost_for_word_pair_by_similarity,
+    calculate_cost_for_epsilon_by_penalty,
 )
 from models import CalculationParameters
 from preprocessing import clean_word
@@ -99,38 +100,33 @@ def build_bipartite_graph(
                 score=similarity,
             )
     # edges from ref word nodes to hyp epsilon-nodes
+    epsilon_cost = calculate_cost_for_epsilon_by_penalty(calculation_parameters.lambda_)
     for i in range(n_r):
         for k in range(n_r):
-            similarity = 1 - calculation_parameters.lambda_
-            cost = calculate_cost_for_word_pair_by_similarity(similarity)
-
             G.add_edge(
                 _get_node_name(REFERENCE_PARTITION, i),
                 _get_node_name(HYPOTHESIS_PARTITION, k, eps=True),
                 capacity=1,
-                weight=cost,
-                score=similarity,
+                weight=epsilon_cost,
+                score=None,
             )
 
     # edges from ref epsilon-nodes to hyp word nodes
     for j in range(n_h):
         for k in range(n_h):
-            similarity = 1 - calculation_parameters.lambda_
-            cost = calculate_cost_for_word_pair_by_similarity(similarity)
-
             G.add_edge(
                 _get_node_name(REFERENCE_PARTITION, j, eps=True),
                 _get_node_name(HYPOTHESIS_PARTITION, k),
                 capacity=1,
-                weight=cost,
-                score=similarity,
+                weight=epsilon_cost,
+                score=None,
             )
     # edges from ref epsilon-nodes to hyp epsilon-nodes
     for j in range(n_h):
         for i in range(n_r):
             G.add_edge(_get_node_name(REFERENCE_PARTITION, j, eps=True),
                        _get_node_name(HYPOTHESIS_PARTITION, i, eps=True),
-                       capacity=1, weight=0, score=1)
+                       capacity=1, weight=0, score=None)
 
     # edges from H' to t
     for i in range(n_r):
