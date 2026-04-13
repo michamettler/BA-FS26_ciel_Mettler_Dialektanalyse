@@ -2,7 +2,7 @@
 Cross-comparison logic for word-level dialect analysis.
 
 Naive baseline approach: compares every reference word against every hypothesis word
-(exhaustive O(n×m) cross-comparison without 1:1 alignment constraint).
+(exhaustive O(n x m) cross-comparison without 1:1 alignment constraint).
 """
 
 import pandas as pd

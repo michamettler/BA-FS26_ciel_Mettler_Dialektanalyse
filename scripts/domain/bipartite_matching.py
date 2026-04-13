@@ -139,7 +139,7 @@ def build_full_bipartite_graph(
 
 def solve_matching(G: nx.DiGraph) -> dict[str, str]:
     """Solve the min-cost max-flow problem on the given bipartite graph to find the optimal matching.
-    Solving by network simplex algorithm.
+    Solving done by network simplex algorithm.
 
     Args:
         G: A NetworkX directed graph representing the bipartite flow network.
@@ -149,7 +149,7 @@ def solve_matching(G: nx.DiGraph) -> dict[str, str]:
     """
     flow_dict = nx.min_cost_flow(G, weight="weight")  # TODO hungarian as alternative
 
-    # Extract matching: for each node w in W', find the matched node v in V' with flow=1
+    # Extract matching: for each node r in R', find the matched node h in H' with flow=1
     matching = {}
     for w, neighbors in flow_dict.items():
         for v, flow in neighbors.items():
@@ -198,14 +198,6 @@ def build_reduced_graph_by_matching(G: nx.DiGraph, matching: dict[str, str]) -> 
 
 def get_node_name(partition: str, index: int, eps: bool = False) -> str:
     """Build a node name from partition, index, and optional epsilon flag.
-
-    Args:
-        partition: The partition identifier (REFERENCE_PARTITION or HYPOTHESIS_PARTITION).
-        index: The numerical index of the node.
-        eps: Whether the node is an epsilon (padding) node.
-
-    Returns:
-        A node name string, e.g. "ref_0" or "hyp_ε_2".
     """
     if eps:
         return f"{partition}_{EPS}_{index}"
@@ -216,12 +208,6 @@ def extract_index_from_node_name(node_name: str) -> int:
     """Extract the numerical index from a node name like "ref_3" or "hyp_ε_2".
 
     Splits on underscores and returns the last segment as an integer.
-
-    Args:
-        node_name: Node name string where the last underscore-separated segment is a numeric index.
-
-    Returns:
-        The extracted integer index.
     """
     return int(node_name.split("_")[-1])
 
@@ -247,12 +233,6 @@ def get_sink_edges(graph: nx.DiGraph) -> list[tuple[str, str]]:
 
 def get_bipartite_edges(graph: nx.DiGraph) -> list[tuple[str, str]]:
     """Get all edges between the reference and hypothesis partitions (ref -> hyp).
-
-    Args:
-        graph: A NetworkX directed graph with partition attributes on nodes.
-
-    Returns:
-        A list of (u, v) tuples for edges from reference to hypothesis nodes.
     """
     return [(u, v) for u, v in graph.edges()
             if graph.nodes[u].get(ATTR_PARTITION) == REFERENCE_PARTITION
@@ -261,15 +241,7 @@ def get_bipartite_edges(graph: nx.DiGraph) -> list[tuple[str, str]]:
 
 def get_word_edges(graph: nx.DiGraph, matching_edges: list[tuple[str, str]]) -> list[tuple[str, str]]:
     """Extract word-level edges from a list of matching edges.
-
     Filters out edges where either endpoint is an epsilon node.
-
-    Args:
-        graph: A NetworkX directed graph with "word" attributes on nodes.
-        matching_edges: A list of tuples, where each tuple represents an edge between two nodes.
-
-    Returns:
-        A list of tuples representing edges where neither node is an epsilon node.
     """
     return [(u, v) for u, v in matching_edges
             if not is_eps_node(graph.nodes[u]) and not is_eps_node(graph.nodes[v])]
@@ -277,15 +249,7 @@ def get_word_edges(graph: nx.DiGraph, matching_edges: list[tuple[str, str]]) -> 
 
 def get_epsilon_edges(graph: nx.DiGraph, matching_edges: list[tuple[str, str]]) -> list[tuple[str, str]]:
     """Extract epsilon edges from a list of matching edges.
-
     Returns only edges where at least one endpoint is an epsilon node.
-
-    Args:
-        graph: A NetworkX directed graph with "word" attributes on nodes.
-        matching_edges: A list of edges represented as tuples of strings.
-
-    Returns:
-        A list of edges where at least one node is an epsilon node.
     """
     return [(u, v) for u, v in matching_edges
             if is_eps_node(graph.nodes[u]) or is_eps_node(graph.nodes[v])]
