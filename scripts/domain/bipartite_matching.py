@@ -83,14 +83,13 @@ def build_full_bipartite_graph(
             ref_word = clean_word(ref_words[i])
             hyp_word = clean_word(hyp_words[j])
 
-            similarity, word_similarity, position_similarity = (
-                calculate_similarities_for_word_pair(
-                    ref_word=ref_word,
-                    ref_position=i,
-                    hyp_word=hyp_word,
-                    hyp_position=j,
-                    calculation_parameters=calculation_parameters,
-                ))
+            similarity, _, _ = calculate_similarities_for_word_pair(
+                ref_word=ref_word,
+                ref_position=i,
+                hyp_word=hyp_word,
+                hyp_position=j,
+                calculation_parameters=calculation_parameters,
+            )
             cost = calculate_cost_for_word_pair_by_similarity(similarity)
 
             G.add_edge(
