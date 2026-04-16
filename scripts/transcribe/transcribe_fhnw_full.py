@@ -33,6 +33,9 @@ import pandas as pd
 from tqdm import tqdm
 from gradio_client import Client, handle_file
 
+# ── thread-local Gradio clients (reused across files) ───────────────────────
+_thread_local = threading.local()
+
 # ── paths ────────────────────────────────────────────────────────────────────
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 DATASET_DIR = PROJECT_ROOT / "datasets" / "STT4SG-350 v2.1"
@@ -83,17 +86,39 @@ def _extract_uuid(result_text: str) -> str | None:
 
 
 PER_FILE_TIMEOUT = 120  # hard timeout per attempt in seconds
+POLL_INTERVAL = 5  # seconds between status checks
+
+
+def _get_upload_client() -> Client:
+    """Return a per-thread reusable upload client (avoids repeated handshakes)."""
+    client = getattr(_thread_local, "upload_client", None)
+    if client is None:
+        client = Client(
+            UPLOAD_URL, verbose=False, httpx_kwargs={"timeout": 30.0}
+        )
+        _thread_local.upload_client = client
+    return client
+
+
+def _reset_upload_client():
+    """Discard the cached client so the next call creates a fresh one."""
+    _thread_local.upload_client = None
 
 
 def _do_one_attempt(audio_path: Path) -> str:
-    """Single upload+poll attempt (runs inside a timeout wrapper)."""
-    httpx_timeout = {"timeout": 30.0}
+    """Single upload+poll attempt with a wall-clock deadline."""
+    deadline = time.monotonic() + PER_FILE_TIMEOUT
 
-    upload_client = Client(UPLOAD_URL, verbose=False, httpx_kwargs=httpx_timeout)
-    upload_result = upload_client.predict(
-        file_path=handle_file(str(audio_path)),
-        api_name="/handle_upload",
-    )
+    try:
+        upload_client = _get_upload_client()
+        upload_result = upload_client.predict(
+            file_path=handle_file(str(audio_path)),
+            api_name="/handle_upload",
+        )
+    except Exception:
+        _reset_upload_client()
+        raise
+
     uuid = _extract_uuid(str(upload_result))
     if not uuid:
         return "ERROR: NO UUID"
@@ -104,45 +129,41 @@ def _do_one_attempt(audio_path: Path) -> str:
         verbose=False,
     )
 
-    for poll in range(60):
+    max_polls = int(PER_FILE_TIMEOUT / POLL_INTERVAL)
+    for poll in range(max_polls):
         if _shutdown.is_set():
             return "ERROR: SHUTDOWN"
+        if time.monotonic() >= deadline:
+            return "ERROR: POLL TIMEOUT"
         result = status_client.predict(api_name="/check_file_status")
         txt_path = (
             result[4].get("value") if isinstance(result[4], dict) else result[4]
         )
         if txt_path is not None:
             break
-        time.sleep(5)
+        time.sleep(POLL_INTERVAL)
     else:
         return "ERROR: POLL TIMEOUT"
 
     return Path(txt_path).read_text(encoding="utf-8").strip()
 
 
-def transcribe_single(audio_path: Path, max_retries: int = 3, delay: float = 0.5) -> str:
-    """Transcribe one audio file via the FHNW Gradio API (thread-safe).
-    Each attempt has a hard timeout to prevent indefinite blocking."""
+def transcribe_single(audio_path: Path, max_retries: int = 3) -> str:
+    """Transcribe one audio file via the FHNW Gradio API (thread-safe)."""
     for attempt in range(max_retries):
         if _shutdown.is_set():
             return "ERROR: SHUTDOWN"
-        time.sleep(delay)
+        if attempt > 0:
+            time.sleep(2 ** attempt)
         try:
-            with ThreadPoolExecutor(max_workers=1) as mini_pool:
-                future = mini_pool.submit(_do_one_attempt, audio_path)
-                result = future.result(timeout=PER_FILE_TIMEOUT)
+            result = _do_one_attempt(audio_path)
             if result == "ERROR: NO UUID" and attempt < max_retries - 1:
-                time.sleep(2 ** attempt)
+                _reset_upload_client()
                 continue
             return result
-        except TimeoutError:
-            if attempt < max_retries - 1:
-                time.sleep(2 ** attempt)
-                continue
-            return "ERROR: ATTEMPT TIMEOUT"
         except Exception as e:
+            _reset_upload_client()
             if attempt < max_retries - 1:
-                time.sleep(2 ** attempt)
                 continue
             return f"ERROR: {e}"
 
@@ -236,11 +257,8 @@ def run(split: str, workers: int, checkpoint_every: int, restart: bool):
         bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}] {postfix}",
     )
 
-    def process(idx: int):
-        nonlocal new_since_ckpt, errors
-        if _shutdown.is_set():
-            return
-
+    def process(idx: int) -> tuple[str, str]:
+        """Transcribe one file and return (path, result)."""
         row = df.iloc[idx]
         audio_path = clips_dir / row["path"]
 
@@ -253,34 +271,67 @@ def run(split: str, workers: int, checkpoint_every: int, restart: bool):
             result = f"ERROR: {e}"
             tqdm.write(f"  [WORKER ERROR] {row['path'][:60]}: {e}")
 
-        with lock:
-            completed[row["path"]] = result
-            if result.startswith("ERROR"):
-                errors += 1
-            new_since_ckpt += 1
-            pbar.update(1)
-            pbar.set_postfix(ok=len(completed) - errors, err=errors, ordered=False)
-
-            if new_since_ckpt >= checkpoint_every:
-                save_checkpoint(split, completed)
-                new_since_ckpt = 0
+        return row["path"], result
 
     with ThreadPoolExecutor(max_workers=workers) as pool:
-        futures = {pool.submit(process, idx): idx for idx in pending}
-        for future in as_completed(futures):
+        # Submit work incrementally to keep at most 2*workers tasks in flight,
+        # so shutdown is responsive and memory stays flat.
+        pending_iter = iter(pending)
+        futures: dict = {}
+        max_in_flight = workers * 2
+
+        def _submit_next():
+            for idx in pending_iter:
+                if _shutdown.is_set():
+                    return
+                fut = pool.submit(process, idx)
+                futures[fut] = idx
+                if len(futures) >= max_in_flight:
+                    return
+
+        _submit_next()
+
+        while futures:
+            done = next(as_completed(futures), None)
+            if done is None:
+                break
+            del futures[done]
+
             if _shutdown.is_set():
-                # cancel remaining futures
                 for f in futures:
                     f.cancel()
                 break
+
             try:
-                future.result()
+                path, result = done.result()
             except Exception as exc:
                 tqdm.write(f"Unexpected worker error: {exc}")
+                _submit_next()
+                continue
+
+            do_checkpoint = False
+            with lock:
+                completed[path] = result
+                if result.startswith("ERROR"):
+                    errors += 1
+                new_since_ckpt += 1
+                pbar.update(1)
+                pbar.set_postfix(ok=len(completed) - errors, err=errors, ordered=False)
+
+                if new_since_ckpt >= checkpoint_every:
+                    do_checkpoint = True
+                    new_since_ckpt = 0
+
+            if do_checkpoint:
+                with lock:
+                    snapshot = dict(completed)
+                save_checkpoint(split, snapshot)
+
+            _submit_next()
 
     pbar.close()
 
-    # always save on exit
+    # always save on exit (no lock needed — pool is shut down)
     save_checkpoint(split, completed)
     print(f"  Checkpoint saved ({len(completed):,} files).")
 
