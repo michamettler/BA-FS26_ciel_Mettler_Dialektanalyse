@@ -105,19 +105,15 @@ def _reset_upload_client():
     _thread_local.upload_client = None
 
 
-def _do_one_attempt(audio_path: Path) -> str:
-    """Single upload+poll attempt with a wall-clock deadline."""
+def _do_one_attempt(audio_path: Path, upload_client: Client) -> str:
+    """Single upload+poll attempt with a wall-clock deadline.
+    The upload_client is passed in from the outer worker thread (where it's cached)."""
     deadline = time.monotonic() + PER_FILE_TIMEOUT
 
-    try:
-        upload_client = _get_upload_client()
-        upload_result = upload_client.predict(
-            file_path=handle_file(str(audio_path)),
-            api_name="/handle_upload",
-        )
-    except Exception:
-        _reset_upload_client()
-        raise
+    upload_result = upload_client.predict(
+        file_path=handle_file(str(audio_path)),
+        api_name="/handle_upload",
+    )
 
     uuid = _extract_uuid(str(upload_result))
     if not uuid:
@@ -149,19 +145,35 @@ def _do_one_attempt(audio_path: Path) -> str:
 
 
 def transcribe_single(audio_path: Path, max_retries: int = 3) -> str:
-    """Transcribe one audio file via the FHNW Gradio API (thread-safe)."""
+    """Transcribe one audio file via the FHNW Gradio API (thread-safe).
+    Each attempt is wrapped with a hard timeout to prevent indefinite blocking.
+    The upload client is managed on this (outer worker) thread and passed into the
+    timeout wrapper so thread-local reuse works across files."""
     for attempt in range(max_retries):
         if _shutdown.is_set():
             return "ERROR: SHUTDOWN"
         if attempt > 0:
             time.sleep(2 ** attempt)
+        upload_client = _get_upload_client()
+        mini = ThreadPoolExecutor(max_workers=1)
+        future = mini.submit(_do_one_attempt, audio_path, upload_client)
         try:
-            result = _do_one_attempt(audio_path)
+            result = future.result(timeout=PER_FILE_TIMEOUT)
+            mini.shutdown(wait=False)
             if result == "ERROR: NO UUID" and attempt < max_retries - 1:
                 _reset_upload_client()
                 continue
             return result
+        except TimeoutError:
+            # Don't wait for the hung thread — let it die on its own via
+            # httpx timeout (30s) or the poll deadline. Discard the stale client.
+            mini.shutdown(wait=False, cancel_futures=True)
+            _reset_upload_client()
+            if attempt < max_retries - 1:
+                continue
+            return "ERROR: ATTEMPT TIMEOUT"
         except Exception as e:
+            mini.shutdown(wait=False)
             _reset_upload_client()
             if attempt < max_retries - 1:
                 continue
@@ -274,60 +286,44 @@ def run(split: str, workers: int, checkpoint_every: int, restart: bool):
         return row["path"], result
 
     with ThreadPoolExecutor(max_workers=workers) as pool:
-        # Submit work incrementally to keep at most 2*workers tasks in flight,
-        # so shutdown is responsive and memory stays flat.
-        pending_iter = iter(pending)
-        futures: dict = {}
-        max_in_flight = workers * 2
-
-        def _submit_next():
-            for idx in pending_iter:
-                if _shutdown.is_set():
-                    return
-                fut = pool.submit(process, idx)
-                futures[fut] = idx
-                if len(futures) >= max_in_flight:
-                    return
-
-        _submit_next()
-
-        while futures:
-            done = next(as_completed(futures), None)
-            if done is None:
-                break
-            del futures[done]
-
+        # Process in batches to avoid 160k+ futures in memory at once,
+        # while keeping workers saturated within each batch.
+        batch_size = max(workers * 50, 500)
+        for batch_start in range(0, len(pending), batch_size):
             if _shutdown.is_set():
-                for f in futures:
-                    f.cancel()
                 break
+            batch = pending[batch_start:batch_start + batch_size]
+            futures = {pool.submit(process, idx): idx for idx in batch}
 
-            try:
-                path, result = done.result()
-            except Exception as exc:
-                tqdm.write(f"Unexpected worker error: {exc}")
-                _submit_next()
-                continue
+            for future in as_completed(futures):
+                if _shutdown.is_set():
+                    for f in futures:
+                        f.cancel()
+                    break
 
-            do_checkpoint = False
-            with lock:
-                completed[path] = result
-                if result.startswith("ERROR"):
-                    errors += 1
-                new_since_ckpt += 1
-                pbar.update(1)
-                pbar.set_postfix(ok=len(completed) - errors, err=errors, ordered=False)
+                try:
+                    path, result = future.result()
+                except Exception as exc:
+                    tqdm.write(f"Unexpected worker error: {exc}")
+                    continue
 
-                if new_since_ckpt >= checkpoint_every:
-                    do_checkpoint = True
-                    new_since_ckpt = 0
-
-            if do_checkpoint:
+                do_checkpoint = False
                 with lock:
-                    snapshot = dict(completed)
-                save_checkpoint(split, snapshot)
+                    completed[path] = result
+                    if result.startswith("ERROR"):
+                        errors += 1
+                    new_since_ckpt += 1
+                    pbar.update(1)
+                    pbar.set_postfix(ok=len(completed) - errors, err=errors, ordered=False)
 
-            _submit_next()
+                    if new_since_ckpt >= checkpoint_every:
+                        do_checkpoint = True
+                        new_since_ckpt = 0
+
+                if do_checkpoint:
+                    with lock:
+                        snapshot = dict(completed)
+                    save_checkpoint(split, snapshot)
 
     pbar.close()
 
