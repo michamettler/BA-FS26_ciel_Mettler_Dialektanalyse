@@ -82,10 +82,6 @@ def grid_search(entries, alphas, lambdas, lexical_normalization_modes):
 
 def pivot_f1_grids(df, alphas=None, lambdas=None):
     """Pivot a grid search DataFrame into {use_global_lexical_normalization: 2D array} grids.
-
-    The returned arrays are explicitly reindexed to the provided alpha/lambda order so
-    callers can safely map rows and columns back to the parameter values used for plotting.
-    If no order is provided, sorted unique values from the DataFrame are used.
     """
     alpha_order = list(alphas) if alphas is not None else sorted(df["alpha"].unique())
     lambda_order = list(lambdas) if lambdas is not None else sorted(df["lambda"].unique())
