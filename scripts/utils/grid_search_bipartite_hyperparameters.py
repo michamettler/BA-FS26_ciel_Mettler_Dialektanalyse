@@ -37,7 +37,7 @@ def evaluate_alignment(idx_based_solver_alignment: dict, ground_truth_alignment:
     fp = len(solver_edges - gt_edges)  # false positives, wrong matchings
     fn = len(gt_edges - solver_edges)  # false negatives, missed matchings
 
-    precision = tp / (tp + fp) if (tp + fp) > 0 else 1.0
+    precision = tp / (tp + fp) if (tp + fp) > 0 else (1.0 if not gt_edges else 0.0)
     recall = tp / (tp + fn) if (tp + fn) > 0 else 1.0
     f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
 
