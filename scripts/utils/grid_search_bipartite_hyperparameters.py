@@ -46,6 +46,8 @@ def evaluate_alignment(idx_based_solver_alignment: dict, ground_truth_alignment:
 
 def grid_search(entries, alphas, lambdas, lexical_normalization_modes):
     """Run grid search over all (alpha, lambda, lexical_normalization_modes) combinations. Returns a DataFrame."""
+    global_max_word_len = max(len(w) for entry in entries for w in entry["ref"] + entry["hyp"])
+
     results = []
     for alpha in alphas:
         for lambda_ in lambdas:
@@ -53,12 +55,12 @@ def grid_search(entries, alphas, lambdas, lexical_normalization_modes):
                 precisions, recalls, f1s = [], [], []
                 for entry in entries:
                     ref, hyp = entry["ref"], entry["hyp"]
-                    max_word_len = max(len(w) for w in ref + hyp) if use_global_lexical_normalization else None
 
                     similarity_calculator = WordSimilarityCalculator(
                         sent_len=max(len(ref), len(hyp)),
                         alpha=alpha, lambda_=lambda_,
-                        use_global_lexical_normalization=use_global_lexical_normalization, max_word_len=max_word_len,
+                        use_global_lexical_normalization=use_global_lexical_normalization,
+                        max_word_len=global_max_word_len if use_global_lexical_normalization else None,
                     )
                     G = build_full_bipartite_graph(ref, hyp, similarity_calculator)
                     solver_matching = solve_matching(G)
