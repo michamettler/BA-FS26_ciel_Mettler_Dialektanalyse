@@ -247,10 +247,10 @@ def plot_grid_search_heatmaps(
     all_values = np.concatenate([data.ravel() for data, _ in panels])
     vmin, vmax = all_values.min(), all_values.max()
 
-    alpha_tick_positions = list(range(0, len(alphas), tick_step))
-    lambda_tick_positions = list(range(0, len(lambdas), tick_step))
-    alpha_tick_labels = [f"{alphas[k]:.2f}" for k in alpha_tick_positions]
-    lambda_tick_labels = [f"{lambdas[k]:.2f}" for k in lambda_tick_positions]
+    alpha_tick_positions = [k + 0.5 for k in range(0, len(alphas), tick_step)]
+    lambda_tick_positions = [k + 0.5 for k in range(0, len(lambdas), tick_step)]
+    alpha_tick_labels = [f"{alphas[k]:.2f}" for k in range(0, len(alphas), tick_step)]
+    lambda_tick_labels = [f"{lambdas[k]:.2f}" for k in range(0, len(lambdas), tick_step)]
 
     for ax, (data, title) in zip(axes, panels):
         sns.heatmap(data, ax=ax, cmap=cmap, vmin=vmin, vmax=vmax,
