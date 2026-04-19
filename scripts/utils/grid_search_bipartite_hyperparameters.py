@@ -46,6 +46,8 @@ def evaluate_alignment(idx_based_solver_alignment: dict, ground_truth_alignment:
 
 def grid_search(entries, alphas, lambdas, lexical_normalization_modes):
     """Run grid search over all (alpha, lambda, lexical_normalization_modes) combinations. Returns a DataFrame."""
+    if not entries:
+        raise ValueError("grid_search() requires a non-empty 'entries' list")
     global_max_word_len = max(len(w) for entry in entries for w in entry["ref"] + entry["hyp"])
 
     results = []
