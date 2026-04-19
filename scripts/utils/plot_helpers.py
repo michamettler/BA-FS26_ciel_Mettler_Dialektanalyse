@@ -247,16 +247,17 @@ def plot_grid_search_heatmaps(
     all_values = np.concatenate([data.ravel() for data, _ in panels])
     vmin, vmax = all_values.min(), all_values.max()
 
-    tick_positions = list(range(0, len(alphas), tick_step))
-    alpha_tick_labels = [f"{alphas[k]:.2f}" for k in tick_positions]
-    lambda_tick_labels = [f"{lambdas[k]:.2f}" for k in tick_positions]
+    alpha_tick_positions = list(range(0, len(alphas), tick_step))
+    lambda_tick_positions = list(range(0, len(lambdas), tick_step))
+    alpha_tick_labels = [f"{alphas[k]:.2f}" for k in alpha_tick_positions]
+    lambda_tick_labels = [f"{lambdas[k]:.2f}" for k in lambda_tick_positions]
 
     for ax, (data, title) in zip(axes, panels):
         sns.heatmap(data, ax=ax, cmap=cmap, vmin=vmin, vmax=vmax,
                     xticklabels=False, yticklabels=False, cbar_kws={"label": "Mean F1"})
-        ax.set_xticks(tick_positions)
+        ax.set_xticks(lambda_tick_positions)
         ax.set_xticklabels(lambda_tick_labels)
-        ax.set_yticks(tick_positions)
+        ax.set_yticks(alpha_tick_positions)
         ax.set_yticklabels(alpha_tick_labels, rotation=0)
         ax.set_xlabel("λ (epsilon penalty)")
         ax.set_ylabel("α (lexical weight)")
