@@ -1,4 +1,4 @@
-index	source	sentence	transcript	is_praeteritum	split
+index	source	reference	hypothesis	is_praeteritum	split
 0	manually constructed	undefiend v1 v2 v3 v4 AUTO v5.	v1 v2 AUTO v3 v4 vx v5.	False	test
 1	manually constructed	Anne mag Butter, und sie mag Butter.	Anne hat Anker gern, und sie hat Anker gern.	False	train
 2	manually constructed	Der Junge spielt mit dem Ball.	Der Bub spielt mit dem Bolle.	False	train
