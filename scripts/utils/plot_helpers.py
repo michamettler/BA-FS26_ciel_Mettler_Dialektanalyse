@@ -223,7 +223,7 @@ def plot_grid_search_heatmaps(
         panels: list[tuple[np.ndarray, str]],
         alphas: np.ndarray,
         lambdas: np.ndarray,
-        suptitle: str,
+        subtitle: str,
         cmap: str = "YlGn",
         highlight_best: bool = True,
         tick_step: int = 5,
@@ -231,21 +231,21 @@ def plot_grid_search_heatmaps(
     """Plot one or more grid-search heatmaps side by side with a shared color scale.
 
     Args:
-        panels: List of (2D array, subtitle) tuples. Each array has shape (len(alphas), len(lambdas)).
+        panels: List of (2D array, subtitle) tuples. Each array has a shape (len(alphas), len(lambdas)).
         alphas: Alpha values used in the grid search (y-axis).
         lambdas: Lambda values used in the grid search (x-axis).
-        suptitle: Overall figure title.
+        subtitle: Overall figure title.
         cmap: Colormap name for seaborn heatmap.
         highlight_best: If True, mark all cells tied for the best value with a red rectangle.
         tick_step: Show every N-th tick label on both axes.
     """
     n_panels = len(panels)
-    fig, axes = plt.subplots(1, n_panels, figsize=(8 * n_panels, 6))
+    fig, axes = plt.subplots(1, n_panels, figsize=(8 * n_panels, 6), constrained_layout=True)
     if n_panels == 1:
         axes = [axes]
 
     all_values = np.concatenate([data.ravel() for data, _ in panels])
-    vmin, vmax = all_values.min(), all_values.max()
+    value_min, value_max = all_values.min(), all_values.max()
 
     alpha_tick_positions = [k + 0.5 for k in range(0, len(alphas), tick_step)]
     lambda_tick_positions = [k + 0.5 for k in range(0, len(lambdas), tick_step)]
@@ -253,7 +253,7 @@ def plot_grid_search_heatmaps(
     lambda_tick_labels = [f"{lambdas[k]:.2f}" for k in range(0, len(lambdas), tick_step)]
 
     for ax, (data, title) in zip(axes, panels):
-        sns.heatmap(data, ax=ax, cmap=cmap, vmin=vmin, vmax=vmax,
+        sns.heatmap(data, ax=ax, cmap=cmap, vmin=value_min, vmax=value_max,
                     xticklabels=False, yticklabels=False, cbar=False)
         ax.set_xticks(lambda_tick_positions)
         ax.set_xticklabels(lambda_tick_labels)
@@ -268,13 +268,12 @@ def plot_grid_search_heatmaps(
             for i, j in np.argwhere(data == best_val):
                 ax.add_patch(plt.Rectangle((j, i), 1, 1, fill=False, edgecolor="red", lw=1.5))
 
-    norm = plt.Normalize(vmin=vmin, vmax=vmax)
+    norm = plt.Normalize(vmin=value_min, vmax=value_max)
     sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
     sm.set_array([])
     fig.colorbar(sm, ax=axes, fraction=0.03, pad=0.04, label="Mean F1")
 
-    plt.suptitle(suptitle)
-    plt.tight_layout()
+    fig.suptitle(subtitle)
     plt.show()
 
 
