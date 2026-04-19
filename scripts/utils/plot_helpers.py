@@ -1,6 +1,8 @@
+import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import matplotlib.ticker as mticker
+import seaborn as sns
 import networkx as nx
 from bipartite_matching import (
     EPS,
@@ -213,6 +215,59 @@ def plot_similarity_distribution(data, title):
         label=f"Mean: {mean_val:.5f}",
     )
     ax.legend(fontsize=8)
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_grid_search_heatmaps(
+        panels: list[tuple[np.ndarray, str]],
+        alphas: np.ndarray,
+        lambdas: np.ndarray,
+        suptitle: str,
+        cmap: str = "YlGn",
+        highlight_best: bool = True,
+        tick_step: int = 5,
+):
+    """Plot one or more grid-search heatmaps side by side with a shared color scale.
+
+    Args:
+        panels: List of (2D array, subtitle) tuples. Each array has shape (len(alphas), len(lambdas)).
+        alphas: Alpha values used in the grid search (y-axis).
+        lambdas: Lambda values used in the grid search (x-axis).
+        suptitle: Overall figure title.
+        cmap: Colormap name for seaborn heatmap.
+        highlight_best: If True, mark all cells tied for the best value with a red rectangle.
+        tick_step: Show every N-th tick label on both axes.
+    """
+    n_panels = len(panels)
+    fig, axes = plt.subplots(1, n_panels, figsize=(8 * n_panels, 6))
+    if n_panels == 1:
+        axes = [axes]
+
+    all_values = np.concatenate([data.ravel() for data, _ in panels])
+    vmin, vmax = all_values.min(), all_values.max()
+
+    tick_positions = list(range(0, len(alphas), tick_step))
+    alpha_tick_labels = [f"{alphas[k]:.2f}" for k in tick_positions]
+    lambda_tick_labels = [f"{lambdas[k]:.2f}" for k in tick_positions]
+
+    for ax, (data, title) in zip(axes, panels):
+        sns.heatmap(data, ax=ax, cmap=cmap, vmin=vmin, vmax=vmax,
+                    xticklabels=False, yticklabels=False, cbar_kws={"label": "Mean F1"})
+        ax.set_xticks(tick_positions)
+        ax.set_xticklabels(lambda_tick_labels)
+        ax.set_yticks(tick_positions)
+        ax.set_yticklabels(alpha_tick_labels, rotation=0)
+        ax.set_xlabel("λ (epsilon penalty)")
+        ax.set_ylabel("α (lexical weight)")
+        ax.set_title(title)
+
+        if highlight_best:
+            best_val = data.max()
+            for i, j in np.argwhere(data == best_val):
+                ax.add_patch(plt.Rectangle((j, i), 1, 1, fill=False, edgecolor="red", lw=1.5))
+
+    plt.suptitle(suptitle)
     plt.tight_layout()
     plt.show()
 
