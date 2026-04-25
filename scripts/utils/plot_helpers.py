@@ -12,7 +12,6 @@ from bipartite_matching import (
     HYPOTHESIS_PARTITION,
     ATTR_WORD,
     ATTR_PARTITION,
-    ATTR_LABEL,
     ATTR_SIMILARITY,
     build_reduced_graph_by_matching,
     extract_index_from_node_name,
@@ -271,7 +270,7 @@ def plot_grid_search_heatmaps(
     norm = plt.Normalize(vmin=value_min, vmax=value_max)
     sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
     sm.set_array([])
-    fig.colorbar(sm, ax=axes, fraction=0.03, pad=0.04, label="Mean F1")
+    fig.colorbar(sm, ax=axes, fraction=0.03, pad=0.04, label="Mean Accuracy")
 
     fig.suptitle(subtitle)
     plt.show()
@@ -330,7 +329,7 @@ def _get_style_for_nodes(graph: nx.DiGraph) -> tuple[dict, list[str], list[int]]
 
     for node, attrs in graph.nodes(data=True):
         node_str = str(node)
-        labels[node] = attrs.get(ATTR_LABEL, attrs.get(ATTR_WORD, node_str))
+        labels[node] = attrs.get(ATTR_WORD, node_str)
 
         if node_str in (SOURCE_NODE, SINK_NODE):
             node_colors.append(_NODE_COLOR_MAP[node_str])
