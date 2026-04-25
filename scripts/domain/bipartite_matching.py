@@ -12,7 +12,6 @@ HYPOTHESIS_PARTITION = "hyp"
 # Node/edge attribute keys
 ATTR_WORD = "word"
 ATTR_PARTITION = "partition"
-ATTR_LABEL = "label"
 ATTR_SIMILARITY = "similarity"  # float for word-word edges, None for epsilon routing edges
 
 
@@ -168,8 +167,8 @@ def build_reduced_graph_by_matching(G: nx.DiGraph, matching: dict[str, str]) -> 
     """
     M = nx.DiGraph()
 
-    M.add_node(SOURCE_NODE, label=SOURCE_NODE)
-    M.add_node(SINK_NODE, label=SINK_NODE)
+    M.add_node(SOURCE_NODE)
+    M.add_node(SINK_NODE)
 
     for r, h in matching.items():
         is_ref_eps = is_eps_node(G.nodes[r])
@@ -177,11 +176,9 @@ def build_reduced_graph_by_matching(G: nx.DiGraph, matching: dict[str, str]) -> 
         if is_ref_eps and is_hyp_eps:
             continue
 
-        M.add_node(r, word=G.nodes[r][ATTR_WORD], label=G.nodes[r][ATTR_WORD],
-                   partition=REFERENCE_PARTITION)
+        M.add_node(r, word=G.nodes[r][ATTR_WORD], partition=REFERENCE_PARTITION)
         M.add_edge(SOURCE_NODE, r, similarity=None)
-        M.add_node(h, word=G.nodes[h][ATTR_WORD], label=G.nodes[h][ATTR_WORD],
-                   partition=HYPOTHESIS_PARTITION)
+        M.add_node(h, word=G.nodes[h][ATTR_WORD], partition=HYPOTHESIS_PARTITION)
         M.add_edge(h, SINK_NODE, similarity=None)
 
         similarity = G.edges[r, h].get(ATTR_SIMILARITY)
