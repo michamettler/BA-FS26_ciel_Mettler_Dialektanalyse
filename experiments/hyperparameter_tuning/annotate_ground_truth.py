@@ -41,7 +41,8 @@ def tokenize(text: str) -> list[str]:
 
 
 def solver_prefill(ref: list[str], hyp: list[str], alpha: float, lambda_: float,
-                   use_global_norm: bool) -> tuple[dict[int, int | None], dict[int, float | None]]:
+                   use_global_norm: bool, global_max_word_len: int | None,
+                   ) -> tuple[dict[int, int | None], dict[int, float | None]]:
     """Run the bipartite solver and return (alignment, similarities) keyed by ref_idx.
 
     similarities[i] is the edge similarity for ref[i] (None if matched to epsilon).
@@ -49,11 +50,10 @@ def solver_prefill(ref: list[str], hyp: list[str], alpha: float, lambda_: float,
     if not ref:
         return {}, {}
     sent_len = max(len(ref), len(hyp), 1)
-    max_word_len = max((len(w) for w in ref + hyp), default=1)
     calc = WordSimilarityCalculator(
         alpha=alpha, lambda_=lambda_, sent_len=sent_len,
         use_global_lexical_normalization=use_global_norm,
-        max_word_len=max_word_len if use_global_norm else None,
+        max_word_len=global_max_word_len if use_global_norm else None,
     )
     G = build_full_bipartite_graph(ref, hyp, calc)
     matching = solve_matching(G)
@@ -186,6 +186,19 @@ def annotate_sample(progress: str, path: str, ref: list[str], hyp: list[str],
             console.input("[dim]press enter to continue[/dim]")
             continue
         ref_idx, hyp_idx = result
+        if hyp_idx is not None:
+            conflicting = [r for r, h in alignment.items() if h == hyp_idx and r != ref_idx]
+            for r in conflicting:
+                alignment[r] = None
+                similarities[r] = None
+                edited.add(r)
+            if conflicting:
+                conflicts_str = ", ".join(f"ref[{r}]" for r in conflicting)
+                console.print(
+                    f"[yellow]Auto-unassigned {conflicts_str} (was pointing to hyp[{hyp_idx}]); "
+                    f"now ε. Reassign if needed.[/yellow]"
+                )
+                console.input("[dim]press enter to continue[/dim]")
         alignment[ref_idx] = hyp_idx
         similarities[ref_idx] = None  # mark as user-set; no solver similarity
         edited.add(ref_idx)
@@ -221,6 +234,14 @@ def main() -> None:
         "_metadata.tsv", "_ground_truth_alignments.json"
     )
 
+    global_max_word_len = None
+    if args.use_global_norm:
+        global_max_word_len = max(
+            len(w)
+            for _, row in df.iterrows()
+            for w in tokenize(row["sentence"]) + tokenize(row["whisper_large_v2_transcript"])
+        )
+
     existing = load_existing(output_path)
     done_indices = {e["index"] for e in existing}
     console.print(f"[bold]Loaded {len(existing)} existing entries from {output_path.name}.[/bold]")
@@ -235,7 +256,7 @@ def main() -> None:
         ref = tokenize(row["sentence"])
         hyp = tokenize(row["whisper_large_v2_transcript"])
         alignment, similarities = solver_prefill(
-            ref, hyp, args.alpha, args.lambda_, args.use_global_norm
+            ref, hyp, args.alpha, args.lambda_, args.use_global_norm, global_max_word_len
         )
 
         progress = f"[{len(existing) + 1}/{total}]  index={i}  region={row.get('dialect_region', '?')}"

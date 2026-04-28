@@ -11,3 +11,4 @@ gradio_client
 levenshtein
 transformers
 seaborn
+rich
