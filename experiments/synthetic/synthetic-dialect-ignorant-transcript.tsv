@@ -1,0 +1,12 @@
+index	source	reference	hypothesis	is_praeteritum	split
+0	manually constructed	undefiend v1 v2 v3 v4 AUTO v5.	v1 v2 AUTO v3 v4 vx v5.	False	test
+1	manually constructed	Anne mag Butter, und sie mag Butter.	Anne hat Anker gern, und sie hat Anker gern.	False	train
+2	manually constructed	Der Junge spielt mit dem Ball.	Der Bub spielt mit dem Bolle.	False	train
+3	Tolstoi, Krieg und Frieden	Nun, man hat entschieden, daß Bonaparte seine Schiffe hinter sich verbrannt habe, und es scheint, daß wir im Begriff sind, dasselbe zu tun.	Nun man hat entschieden, dass Bonaparte seine Schiffe hinter sich verbrennt hege, und es scheint, dass mir im Begriff sind, es gleiche zu tun.	False	valid
+4	Hoffmann, Der Sandmann	Mag denn der Junge die Augen behalten und sein Pensum flennen in der Welt.	Mag denn der Bub die Augen behalten und sein Pensum brüllen in der Welt.	False	train
+5	Turgenev, Die erste Liebe	Was machen Sie hier mit den Pferden, junger Herr?	Was machen Sie da mit den Rosen, junger Herr?	False	train
+6	Schiller, Wilhelm Tell	Der See macht eine Bucht ins Land, eine Hütte ist unweit dem Ufer, Fischerknabe fährt sich in einem Kahn.	Der See macht eine Bucht ins Land, eine Hütte ist unweit dem Ufer, Fischerbub Fahrt sich in einem Kahn.	False	train
+7	Melville, Moby Dick	Sie müssen so nahe wie möglich an das Wasser heran, nur gerade, daß sie nich hineinfallen.	Sie Munde so nach wie möglich ans Wasser Anne, nur gerade, dass sie nicht hinein gehen.	False	valid
+8	Homer, Odyssee	Nach dem Sauhirten und Ziegenhirten kömmt der Rinderhirt Philötios, und bewährt seine Treue.	Nach ähm Sauhirten und Giessen Hirten Kund der Rinderhirt Philötios und bewährt seine Treue.	False	train
+9	Schnitzler, Traumnovelle	Das Stubenmädchen hatte den Pelz gebracht, Fridolin küßte Albertine ziemlich zerstreut, als wäre das Gespräch der letzten Stunde aus seinem Gedächtnis schon weggewischt, auf Stirn und Mund und eilte davon.	Das Stubenmeitli hat den Pelz bracht, Fridolin hat Albertine ziemlich zerstreut küsst, als wäre das Gespräch von der Gletscher Stunde aus sein Gedächtnis schon weggewischt, auf Stirn und Mut und ist davon geeilt.	True	valid
+10	Gotthelf, Die schwarze Spinne	Ein Missgeschick nach dem andern traf sie: die Geschirre zerrissen, die Wagen brachen, Pferde und Ochsen fielen oder weigerten den Gehorsam.	Ein Missgeschic nach dem andern hat sie troffen: die Geschirre sind zerrissen, die Wagen sind brochen, Rose und Ochse sind Gehege oder Hände sich ähm Gehorsam geweigert.	True	train
