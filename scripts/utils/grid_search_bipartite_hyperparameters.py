@@ -50,7 +50,7 @@ def evaluate_alignment(M_solver: nx.DiGraph, M_gt: nx.DiGraph) -> float:
 
 
 def _ref_side_edges(M: nx.DiGraph) -> set[tuple]:
-    """Bipartite edges originating from real ref words, with hyp epsilons collapsed."""
+    """Bipartite edges from real ref words (no insertions); for deletions, the specific hyp epsilon index doesn't matter."""
     edges = set()
     for u, v in get_bipartite_edges(M):
         if is_eps_node(M.nodes[u]):
@@ -65,7 +65,7 @@ def grid_search(entries, alphas, lambdas, lexical_normalization_modes):
     """Run grid search over all (alpha, lambda, lexical_normalization_modes) combinations. Returns a DataFrame."""
     if not entries:
         raise ValueError("grid_search() requires a non-empty 'entries' list")
-    global_max_word_len = max(len(w) for entry in entries for w in entry["ref"] + entry["hyp"])
+    global_max_word_len = max(len(w) for entry in entries for w in entry["reference"] + entry["hypothesis"])
 
     results = []
     for alpha in alphas:
@@ -73,7 +73,7 @@ def grid_search(entries, alphas, lambdas, lexical_normalization_modes):
             for use_global_lexical_normalization in lexical_normalization_modes:
                 accuracies = []
                 for entry in entries:
-                    ref, hyp = entry["ref"], entry["hyp"]
+                    ref, hyp = entry["reference"], entry["hypothesis"]
 
                     similarity_calculator = WordSimilarityCalculator(
                         sent_len=max(len(ref), len(hyp)),
