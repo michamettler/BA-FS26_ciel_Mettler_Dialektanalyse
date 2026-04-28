@@ -1,12 +1,15 @@
 """Interactive terminal CLI for ground-truth alignment annotation.
 
-Reads a metadata TSV (with `path`, `sentence`, `whisper_large_v2_transcript`),
+Reads a metadata TSV (with `path`, `sentence`, and a hypothesis column),
 pre-fills an alignment per sample using the bipartite solver, lets the user
 correct it, and writes a JSON file matching the synthetic GT schema.
 
 Usage:
     python annotate_ground_truth.py <metadata.tsv> [--alpha 0.7] [--lambda 0.5]
-                                     [--use-global-norm] [--output <path>]
+                                     [--use-global-norm]
+                                     [--hyp-column whisper_large_v2_transcript]
+                                     [--hyp-suffix dit]
+                                     [--output <path>]
 """
 
 import argparse
@@ -225,13 +228,17 @@ def main() -> None:
     parser.add_argument("--lambda", dest="lambda_", type=float, default=0.5)
     parser.add_argument("--use-global-norm", action="store_true",
                         help="Enable global lexical normalization (default: off).")
+    parser.add_argument("--hyp-column", default="whisper_large_v2_transcript",
+                        help="Metadata TSV column to use as the hypothesis (default: whisper_large_v2_transcript).")
+    parser.add_argument("--hyp-suffix", default="dit",
+                        help="Tag identifying the hypothesis source; appended to the default output filename (default: dit).")
     parser.add_argument("--output", type=Path, default=None,
-                        help="Output JSON. Default: <metadata_stem>_ground_truth_alignments.json next to the input.")
+                        help="Output JSON. Default: <metadata_stem>_ground_truth_alignments_<hyp-suffix>.json next to the input.")
     args = parser.parse_args()
 
     df = pd.read_csv(args.metadata_tsv, sep="\t", encoding="utf-8-sig")
     output_path = args.output or args.metadata_tsv.parent / args.metadata_tsv.name.replace(
-        "_metadata.tsv", "_ground_truth_alignments.json"
+        "_metadata.tsv", f"_ground_truth_alignments_{args.hyp_suffix}.json"
     )
 
     global_max_word_len = None
@@ -239,7 +246,7 @@ def main() -> None:
         global_max_word_len = max(
             len(w)
             for _, row in df.iterrows()
-            for w in tokenize(row["sentence"]) + tokenize(row["whisper_large_v2_transcript"])
+            for w in tokenize(row["sentence"]) + tokenize(row[args.hyp_column])
         )
 
     existing = load_existing(output_path)
@@ -254,7 +261,7 @@ def main() -> None:
             continue
         row = df.iloc[i]
         ref = tokenize(row["sentence"])
-        hyp = tokenize(row["whisper_large_v2_transcript"])
+        hyp = tokenize(row[args.hyp_column])
         alignment, similarities = solver_prefill(
             ref, hyp, args.alpha, args.lambda_, args.use_global_norm, global_max_word_len
         )
