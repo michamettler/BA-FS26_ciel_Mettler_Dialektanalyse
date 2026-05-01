@@ -29,7 +29,7 @@ OUTPUT_TSV = TARGET_DIR / "samples_metadata.tsv"
 REGIONS = ["Wallis", "Zürich"]
 REGION_PREFIX = {"Wallis": "wallis", "Zürich": "zurich"}
 N_SENTENCES = 100
-SEED = 39  # because 42 produced hallucinations
+SEED = 43  # because 42 contained hallucinations
 
 
 def _resolve_audio_path(file_name: str) -> str | None:
