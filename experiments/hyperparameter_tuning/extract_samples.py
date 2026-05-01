@@ -10,7 +10,7 @@ Inputs (test split - the only split where every sentence is recorded in all 7 di
   (provides dat transcript, joined on ``path``)
 
 Output:
-- paired_metadata.tsv with one row per sentence and columns for both regions and both ASR models.
+- samples_metadata.tsv with one row per sentence and columns for both regions and both ASR models.
 """
 
 import pandas as pd
