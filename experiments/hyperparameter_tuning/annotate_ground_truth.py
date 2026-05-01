@@ -7,6 +7,7 @@ correct it, and writes a JSON file matching the synthetic GT schema.
 Usage:
     python annotate_ground_truth.py <metadata.tsv> [--alpha 0.7] [--lambda 0.5]
                                      [--use-global-norm]
+                                     [--path-column path]
                                      [--hyp-column whisper_large_v2_transcript]
                                      [--hyp-suffix dit]
                                      [--output <path>]
@@ -34,7 +35,7 @@ from bipartite_matching import (  # noqa: E402
 from preprocessing import clean_word  # noqa: E402
 from word_similarity_calculator import WordSimilarityCalculator  # noqa: E402
 
-DATASET_SOURCE = "STT4SG-350 v2.1 (train_all)"
+DATASET_SOURCE = "STT4SG-350 v2.1 (test)"
 
 console = Console()
 
@@ -228,6 +229,8 @@ def main() -> None:
     parser.add_argument("--lambda", dest="lambda_", type=float, default=0.5)
     parser.add_argument("--use-global-norm", action="store_true",
                         help="Enable global lexical normalization (default: off).")
+    parser.add_argument("--path-column", default="path",
+                        help="Metadata TSV column holding the audio path (default: path).")
     parser.add_argument("--hyp-column", default="whisper_large_v2_transcript",
                         help="Metadata TSV column to use as the hypothesis (default: whisper_large_v2_transcript).")
     parser.add_argument("--hyp-suffix", default="dit",
@@ -268,7 +271,7 @@ def main() -> None:
 
         progress = f"[{len(existing) + 1}/{total}]  index={i}  region={row.get('dialect_region', '?')}"
         action = annotate_sample(
-            progress, row["path"], ref, hyp, alignment, similarities,
+            progress, row[args.path_column], ref, hyp, alignment, similarities,
             args.alpha, args.lambda_, args.use_global_norm,
         )
 
@@ -291,7 +294,7 @@ def main() -> None:
         entry = {
             "index": i,
             "source": DATASET_SOURCE,
-            "path": row["path"],
+            "path": row[args.path_column],
             "reference": ref,
             "hypothesis": hyp,
             "alignment": {str(k): v for k, v in alignment.items()},
