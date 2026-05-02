@@ -5,7 +5,7 @@ pre-fills an alignment per sample using the bipartite solver, lets the user
 correct it, and writes a JSON file matching the synthetic GT schema.
 
 Usage:
-    python annotate_ground_truth.py <metadata.tsv> [--alpha 0.7] [--lambda 0.5]
+    python annotate_ground_truth.py <metadata.tsv> [--alpha 0.7] [--lambda 0.3]
                                      [--use-global-norm]
                                      [--path-column path]
                                      [--hyp-column whisper_large_v2_transcript]
@@ -226,7 +226,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("metadata_tsv", type=Path, help="Path to the metadata TSV.")
     parser.add_argument("--alpha", type=float, default=0.7)
-    parser.add_argument("--lambda", dest="lambda_", type=float, default=0.5)
+    parser.add_argument("--lambda", dest="lambda_", type=float, default=0.3)
     parser.add_argument("--use-global-norm", action="store_true",
                         help="Enable global lexical normalization (default: off).")
     parser.add_argument("--path-column", default="path",
@@ -269,7 +269,7 @@ def main() -> None:
             ref, hyp, args.alpha, args.lambda_, args.use_global_norm, global_max_word_len
         )
 
-        progress = f"[{len(existing) + 1}/{total}]  index={i}  region={row.get('dialect_region', '?')}"
+        progress = f"[{len(existing) + 1}/{total}]  index={i}  {args.hyp_suffix}"
         action = annotate_sample(
             progress, row[args.path_column], ref, hyp, alignment, similarities,
             args.alpha, args.lambda_, args.use_global_norm,
