@@ -226,6 +226,7 @@ def plot_grid_search_heatmaps(
         cmap: str = "YlGn",
         highlight_best: bool = True,
         tick_step: int = 5,
+        n_levels: int = 20,
 ):
     """Plot one or more grid-search heatmaps side by side with a shared color scale.
 
@@ -237,6 +238,7 @@ def plot_grid_search_heatmaps(
         cmap: Colormap name for seaborn heatmap.
         highlight_best: If True, mark all cells tied for the best value with a red rectangle.
         tick_step: Show every N-th tick label on both axes.
+        n_levels: Number of quantile-based color levels (plateaus get stretched across multiple shades for contrast).
     """
     n_panels = len(panels)
     fig, axes = plt.subplots(1, n_panels, figsize=(8 * n_panels, 6), constrained_layout=True)
@@ -244,7 +246,8 @@ def plot_grid_search_heatmaps(
         axes = [axes]
 
     all_values = np.concatenate([data.ravel() for data, _ in panels])
-    value_min, value_max = all_values.min(), all_values.max()
+    boundaries = np.unique(np.quantile(all_values, np.linspace(0, 1, n_levels + 1)))
+    norm = mcolors.BoundaryNorm(boundaries, ncolors=256, clip=True)
 
     alpha_tick_positions = [k + 0.5 for k in range(0, len(alphas), tick_step)]
     lambda_tick_positions = [k + 0.5 for k in range(0, len(lambdas), tick_step)]
@@ -252,7 +255,7 @@ def plot_grid_search_heatmaps(
     lambda_tick_labels = [f"{lambdas[k]:.2f}" for k in range(0, len(lambdas), tick_step)]
 
     for ax, (data, title) in zip(axes, panels):
-        sns.heatmap(data, ax=ax, cmap=cmap, vmin=value_min, vmax=value_max,
+        sns.heatmap(data, ax=ax, cmap=cmap, norm=norm,
                     xticklabels=False, yticklabels=False, cbar=False)
         ax.invert_yaxis()  # cartesian convention: α=0 at bottom-left, both axes increase outward
         ax.set_xticks(lambda_tick_positions)
@@ -268,7 +271,6 @@ def plot_grid_search_heatmaps(
             for i, j in np.argwhere(data == best_val):
                 ax.add_patch(plt.Rectangle((j, i), 1, 1, fill=False, edgecolor="red", lw=1.5))
 
-    norm = plt.Normalize(vmin=value_min, vmax=value_max)
     sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
     sm.set_array([])
     fig.colorbar(sm, ax=axes, fraction=0.03, pad=0.04, label="Mean Accuracy")
