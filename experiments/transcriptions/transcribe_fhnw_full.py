@@ -39,7 +39,7 @@ _thread_local = threading.local()
 # ── paths ────────────────────────────────────────────────────────────────────
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 DATASET_DIR = PROJECT_ROOT / "datasets" / "STT4SG-350 v2.1"
-OUTPUT_DIR = PROJECT_ROOT / "transcriptions" / "fhnw"
+OUTPUT_DIR = PROJECT_ROOT / "experiments" / "transcriptions" / "fhnw"
 CHECKPOINT_DIR = OUTPUT_DIR / "checkpoints"
 
 # ── FHNW API ─────────────────────────────────────────────────────────────────
