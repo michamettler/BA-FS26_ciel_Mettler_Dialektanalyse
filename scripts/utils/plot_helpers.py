@@ -247,7 +247,12 @@ def plot_grid_search_heatmaps(
 
     all_values = np.concatenate([data.ravel() for data, _ in panels])
     boundaries = np.unique(np.quantile(all_values, np.linspace(0, 1, n_levels + 1)))
-    norm = mcolors.BoundaryNorm(boundaries, ncolors=256, clip=True)
+    if len(boundaries) < 2:
+        # degenerate (all values identical): BoundaryNorm needs at least two boundaries; fall back to a
+        # plain linear norm so the helper still renders a single-color heatmap.
+        norm = mcolors.Normalize(vmin=all_values.min(), vmax=all_values.max())
+    else:
+        norm = mcolors.BoundaryNorm(boundaries, ncolors=256, clip=True)
 
     alpha_tick_positions = [k + 0.5 for k in range(0, len(alphas), tick_step)]
     lambda_tick_positions = [k + 0.5 for k in range(0, len(lambdas), tick_step)]
