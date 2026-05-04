@@ -61,8 +61,19 @@ def _ref_side_edges(M: nx.DiGraph) -> set[tuple]:
     return edges
 
 
-def grid_search(entries, alphas, lambdas, lexical_normalization_modes):
-    """Run grid search over all (alpha, lambda, lexical_normalization_modes) combinations. Returns a DataFrame."""
+def grid_search(entries, alphas, lambdas, lexical_normalization_modes, positional_modes):
+    """Run grid search over all (alpha, lambda, lexical_normalization, positional) combinations.
+
+    Args:
+        entries: ground-truth entries (each with reference, hypothesis, alignment).
+        alphas: alpha values for grid search.
+        lambdas: lambda values for grid search.
+        lexical_normalization_modes: iterable of bool; whether to normalize lexical similarity globally.
+        positional_modes: iterable of bool for use_squared_positional; linear vs. squared positional decay.
+
+    Returns:
+        DataFrame with one row per (alpha, lambda, use_global_lexical_normalization, use_squared_positional).
+    """
     if not entries:
         raise ValueError("grid_search() requires a non-empty 'entries' list")
     global_max_word_len = max(len(w) for entry in entries for w in entry["reference"] + entry["hypothesis"])
@@ -71,46 +82,53 @@ def grid_search(entries, alphas, lambdas, lexical_normalization_modes):
     for alpha in alphas:
         for lambda_ in lambdas:
             for use_global_lexical_normalization in lexical_normalization_modes:
-                accuracies = []
-                for entry in entries:
-                    ref, hyp = entry["reference"], entry["hypothesis"]
+                for use_squared_positional in positional_modes:
+                    accuracies = []
+                    for entry in entries:
+                        ref, hyp = entry["reference"], entry["hypothesis"]
 
-                    similarity_calculator = WordSimilarityCalculator(
-                        sent_len=max(len(ref), len(hyp)),
-                        alpha=alpha, lambda_=lambda_,
-                        use_global_lexical_normalization=use_global_lexical_normalization,
-                        max_word_len=global_max_word_len if use_global_lexical_normalization else None,
-                    )
-                    G = build_full_bipartite_graph(ref, hyp, similarity_calculator)
-                    solver_matching = solve_matching(G)
-                    gt_matching = gt_alignment_to_matching(entry["alignment"])
+                        similarity_calculator = WordSimilarityCalculator(
+                            sent_len=max(len(ref), len(hyp)),
+                            alpha=alpha, lambda_=lambda_,
+                            use_global_lexical_normalization=use_global_lexical_normalization,
+                            max_word_len=global_max_word_len if use_global_lexical_normalization else None,
+                            use_squared_positional=use_squared_positional,
+                        )
+                        G = build_full_bipartite_graph(ref, hyp, similarity_calculator)
+                        solver_matching = solve_matching(G)
+                        gt_matching = gt_alignment_to_matching(entry["alignment"])
 
-                    M_solver = build_reduced_graph_by_matching(G, solver_matching)
-                    M_gt = build_reduced_graph_by_matching(G, gt_matching)
+                        M_solver = build_reduced_graph_by_matching(G, solver_matching)
+                        M_gt = build_reduced_graph_by_matching(G, gt_matching)
 
-                    accuracies.append(evaluate_alignment(M_solver, M_gt))
+                        accuracies.append(evaluate_alignment(M_solver, M_gt))
 
-                results.append({
-                    "alpha": alpha,
-                    "lambda": lambda_,
-                    "use_global_lexical_normalization": use_global_lexical_normalization,
-                    "accuracy": np.mean(accuracies),
-                })
+                    results.append({
+                        "alpha": alpha,
+                        "lambda": lambda_,
+                        "use_global_lexical_normalization": use_global_lexical_normalization,
+                        "use_squared_positional": use_squared_positional,
+                        "accuracy": np.mean(accuracies),
+                    })
     return pd.DataFrame(results)
 
 
 def pivot_accuracy_grids(df, alphas=None, lambdas=None):
-    """Pivot a grid search DataFrame into {use_global_lexical_normalization: 2D array} grids.
+    """Pivot a grid search DataFrame into 2D accuracy grids keyed by mode combinations.
+
+    Returns a dict:
+        - Key: (use_global_lexical_normalization, use_squared_positional) tuples
+        - Value: a 2D ndarray of shape (len(alphas), len(lambdas))
     """
     alpha_order = list(alphas) if alphas is not None else sorted(df["alpha"].unique())
     lambda_order = list(lambdas) if lambdas is not None else sorted(df["lambda"].unique())
 
+    facets = ["use_global_lexical_normalization", "use_squared_positional"]
     grids = {}
-    for mode in sorted(df["use_global_lexical_normalization"].unique()):
-        subset = df[df["use_global_lexical_normalization"] == mode]
+    for key, subset in df.groupby(facets, sort=True):
         pivoted = subset.pivot(index="alpha", columns="lambda", values="accuracy")
         pivoted = pivoted.reindex(index=alpha_order, columns=lambda_order)
-        grids[mode] = pivoted.to_numpy()
+        grids[key] = pivoted.to_numpy()
     return grids
 
 
@@ -120,6 +138,6 @@ def print_best_accuracy_summary(df, label=""):
     tied = df[df["accuracy"] == best_accuracy]
     tied_alphas = sorted(tied["alpha"].unique())
     tied_lambdas = sorted(tied["lambda"].unique())
-    print(f"{label}Best accuracy = {best_accuracy:.3f} ({len(tied)} tied)")
+    print(f"{label}Best accuracy = {best_accuracy:.5f} ({len(tied)} tied)")
     print(f"  α tied: {[f'{a:.2f}' for a in tied_alphas]}")
     print(f"  λ tied: {[f'{l:.2f}' for l in tied_lambdas]}")
