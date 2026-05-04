@@ -12,9 +12,6 @@ from word_similarity_calculator import (
     cost_for_word_pair_by_similarity,
 )
 
-if __name__ == "__main__":
-    unittest.main()
-
 
 class TestWordSimilarityCalculator(unittest.TestCase):
 
@@ -189,3 +186,7 @@ class TestWordSimilarityCalculator(unittest.TestCase):
             calc.combined_weighted_lexical_positional_similarity("haus", 0, "haus", 5),
             0.75,
         )
+
+
+if __name__ == "__main__":
+    unittest.main()

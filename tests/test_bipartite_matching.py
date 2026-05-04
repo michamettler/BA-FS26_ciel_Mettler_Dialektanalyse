@@ -30,9 +30,6 @@ from bipartite_matching import (
 )
 from word_similarity_calculator import WordSimilarityCalculator
 
-if __name__ == "__main__":
-    unittest.main()
-
 
 def ref(i, eps=False):
     return get_node_name(REFERENCE_PARTITION, i, eps=eps)
@@ -228,3 +225,7 @@ class TestHelpers(unittest.TestCase):
         eps_edges = get_epsilon_edges(G, bipartite)
         self.assertEqual(len(word_edges) + len(eps_edges), len(bipartite))
         self.assertEqual(set(word_edges) & set(eps_edges), set())
+
+
+if __name__ == "__main__":
+    unittest.main()
