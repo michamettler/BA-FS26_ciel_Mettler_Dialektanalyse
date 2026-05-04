@@ -254,6 +254,7 @@ def plot_grid_search_heatmaps(
     for ax, (data, title) in zip(axes, panels):
         sns.heatmap(data, ax=ax, cmap=cmap, vmin=value_min, vmax=value_max,
                     xticklabels=False, yticklabels=False, cbar=False)
+        ax.invert_yaxis()  # cartesian convention: α=0 at bottom-left, both axes increase outward
         ax.set_xticks(lambda_tick_positions)
         ax.set_xticklabels(lambda_tick_labels)
         ax.set_yticks(alpha_tick_positions)

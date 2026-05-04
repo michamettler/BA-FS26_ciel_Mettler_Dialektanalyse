@@ -25,6 +25,7 @@ class WordSimilarityCalculator:
         lambda_: Penalty for unmatched words routed through epsilon-nodes, in [0, 1].
         use_global_lexical_normalization: Normalize lexical similarity globally or locally.
         max_word_len: Longest word length for global Levenshtein normalization (required if global).
+        use_squared_positional: If True, square the positional similarity to penalize larger gaps more steeply.
     """
 
     def __init__(
@@ -34,6 +35,7 @@ class WordSimilarityCalculator:
             lambda_: float = 0.3,
             use_global_lexical_normalization: bool = False,
             max_word_len: int | None = None,
+            use_squared_positional: bool = False,
     ):
         if sent_len is None or sent_len <= 0:
             raise ValueError(f"sent_len must be > 0; got {sent_len}")
@@ -50,6 +52,7 @@ class WordSimilarityCalculator:
         self.lambda_ = lambda_
         self.use_global_lexical_normalization = use_global_lexical_normalization
         self.max_word_len = max_word_len
+        self.use_squared_positional = use_squared_positional
 
     def combined_weighted_lexical_positional_similarity(
             self,
@@ -97,18 +100,16 @@ class WordSimilarityCalculator:
     def positional_similarity(self, ref_index: int, hyp_index: int) -> float:
         """Positional similarity via the gap between word positions, normalized by sentence length.
 
-        Returns 1.0 if positions are identical, 0.0 if the gap is maximal relative to the sentence length.
+        For N > 1:  sim = 1 - |i - j| / (N - 1)
+        For N = 1:  sim = 1.0 (single-word sentence — position is irrelevant)
+
+        When use_squared_positional is True, the linear similarity is squared;
+        small gaps stay close to 1, mid/large gaps are penalized more.
         """
         if self.sent_len > 1:
-            distance_to_hyp_word = abs(ref_index - hyp_index)
-            max_possible_distance = (
-                    self.sent_len - 1
-            )  # -1 because max index gap in a sequence of length n is n-1, needed for worst case to be 0
-            return max(0.0,
-                       1.0 - (distance_to_hyp_word / max_possible_distance)
-                       )  # max to make sure similarity is never negative
-        else:
-            return 1.0  # sentence only has 0 or 1 words, so position is irrelevant - treat as perfect match
+            linear_similarity = 1.0 - abs(ref_index - hyp_index) / (self.sent_len - 1)
+            return linear_similarity ** 2 if self.use_squared_positional else linear_similarity
+        return 1.0
 
     def cost_for_epsilon_by_penalty(self) -> int:
         """Convert an epsilon penalty to an integer cost for the network flow algorithm.
