@@ -238,7 +238,7 @@ def plot_grid_search_heatmaps(
         cmap: Colormap name for seaborn heatmap.
         highlight_best: If True, mark all cells tied for the best value with a red rectangle.
         tick_step: Show every N-th tick label on both axes.
-        n_levels: Number of quantile-based color levels (plateaus get stretched across multiple shades for contrast).
+        n_levels: Number of quantile-based color levels (for contrast).
     """
     n_panels = len(panels)
     fig, axes = plt.subplots(1, n_panels, figsize=(8 * n_panels, 6), constrained_layout=True)
