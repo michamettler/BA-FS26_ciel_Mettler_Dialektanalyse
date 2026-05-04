@@ -2,7 +2,8 @@
 
 Reads a metadata TSV (with `path`, `sentence`, and a hypothesis column),
 pre-fills an alignment per sample using the bipartite solver, lets the user
-correct it, and writes a JSON file matching the synthetic-test-data GT schema.
+correct it, and writes a hyperparameter-tuning ground-truth JSON file whose
+entries include the source `path` alongside the alignment data.
 
 Usage:
     python annotate_ground_truth.py <metadata.tsv> [--alpha 0.7] [--lambda 0.3]
