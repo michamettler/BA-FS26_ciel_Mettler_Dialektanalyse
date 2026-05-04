@@ -187,6 +187,46 @@ class TestWordSimilarityCalculator(unittest.TestCase):
             0.75,
         )
 
+    # cost scaling
+
+    def test_cost_for_word_pair_is_zero_when_similarity_is_one(self):
+        self.assertEqual(cost_for_word_pair_by_similarity(1.0), 0)
+
+    def test_cost_for_word_pair_is_max_when_similarity_is_zero(self):
+        # network simplex requires integer weights; max cost = scale = 1000
+        self.assertEqual(cost_for_word_pair_by_similarity(0.0), 1000)
+
+    def test_cost_for_word_pair_scales_linearly_with_one_minus_similarity(self):
+        # cost = round((1 - sim) * 1000)
+        self.assertEqual(cost_for_word_pair_by_similarity(0.75), 250)
+        self.assertEqual(cost_for_word_pair_by_similarity(0.5), 500)
+        self.assertEqual(cost_for_word_pair_by_similarity(0.1), 900)
+
+    def test_cost_for_epsilon_is_zero_when_lambda_is_zero(self):
+        calc = WordSimilarityCalculator(sent_len=5, lambda_=0.0)
+        self.assertEqual(calc.cost_for_epsilon_by_penalty(), 0)
+
+    def test_cost_for_epsilon_is_max_when_lambda_is_one(self):
+        calc = WordSimilarityCalculator(sent_len=5, lambda_=1.0)
+        self.assertEqual(calc.cost_for_epsilon_by_penalty(), 1000)
+
+    def test_cost_for_epsilon_scales_linearly_with_lambda(self):
+        # cost = round(lambda * 1000)
+        self.assertEqual(WordSimilarityCalculator(sent_len=5, lambda_=0.3).cost_for_epsilon_by_penalty(), 300)
+        self.assertEqual(WordSimilarityCalculator(sent_len=5, lambda_=0.5).cost_for_epsilon_by_penalty(), 500)
+        self.assertEqual(WordSimilarityCalculator(sent_len=5, lambda_=0.45).cost_for_epsilon_by_penalty(), 450)
+
+    def test_cost_for_epsilon_rounds_to_nearest_int(self):
+        # 0.1234 * 1000 = 123.4, rounds to 123
+        calc = WordSimilarityCalculator(sent_len=5, lambda_=0.1234)
+        self.assertEqual(calc.cost_for_epsilon_by_penalty(), 123)
+
+    def test_word_pair_and_epsilon_costs_share_consistent_scaling(self):
+        # both cost converters use the same _COST_SCALE; the same numeric input
+        # should produce the same integer output via either path
+        calc = WordSimilarityCalculator(sent_len=5, lambda_=0.4)
+        self.assertEqual(calc.cost_for_epsilon_by_penalty(), cost_for_word_pair_by_similarity(0.6))
+
 
 if __name__ == "__main__":
     unittest.main()
