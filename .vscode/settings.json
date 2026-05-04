@@ -1,7 +1,0 @@
-{
-    "python.analysis.extraPaths": [
-        "scripts/domain",
-        "scripts/utils",
-        "scripts"
-    ]
-}
