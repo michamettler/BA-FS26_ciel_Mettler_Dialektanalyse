@@ -30,13 +30,16 @@ def build_full_bipartite_graph(
     All edge capacities are 1 (unit flow).
 
     Args:
-        ref_words: List of words in the reference sentence.
-        hyp_words: List of words in the hypothesis sentence.
+        ref_words: Reference tokens. Cleaned internally via preprocessing.clean_word.
+        hyp_words: Hypothesis tokens. Cleaned internally via preprocessing.clean_word.
         calculator: WordSimilarityCalculator instance for computing similarities and costs.
 
     Returns:
         A NetworkX directed graph representing the bipartite flow network with nodes and edges as described above.
     """
+    # Clean once up-front; reused for both node attributes and the O(n_r*n_h) similarity loop.
+    ref_words = [clean_word(w) for w in ref_words]
+    hyp_words = [clean_word(w) for w in hyp_words]
 
     # --- Graph ---
     G = nx.DiGraph()
@@ -74,13 +77,10 @@ def build_full_bipartite_graph(
     # edges from ref word nodes to hyp word nodes
     for i in range(n_r):
         for j in range(n_h):
-            ref_word = clean_word(ref_words[i])
-            hyp_word = clean_word(hyp_words[j])
-
             similarity = calculator.combined_weighted_lexical_positional_similarity(
-                ref_word=ref_word,
+                ref_word=ref_words[i],
                 ref_position=i,
-                hyp_word=hyp_word,
+                hyp_word=hyp_words[j],
                 hyp_position=j,
             )
             cost = cost_for_word_pair_by_similarity(similarity)

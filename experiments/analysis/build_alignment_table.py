@@ -2,7 +2,7 @@
 Build word-alignment parquets for STT4SG-350 train_all.
 
 Aligns each sentence's reference (canonical Hochdeutsch) against both ASR outputs
-using the calibrated bipartite solver, and writes one parquet per model.
+using the calibrated bipartite solver and writes one parquet per model.
 Per-sentence metadata (region, speaker, etc.) lives in the source transcript TSVs
 and is joined back at analysis time on `path`.
 
@@ -23,6 +23,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "scripts" / "utils"))
 
 from bipartite_matching import (  # noqa: E402
     ATTR_SIMILARITY,
+    ATTR_WORD,
     build_full_bipartite_graph,
     build_reduced_graph_by_matching,
     extract_index_from_node_name,
@@ -30,7 +31,6 @@ from bipartite_matching import (  # noqa: E402
     is_eps_node,
     solve_matching,
 )
-from preprocessing import clean_word  # noqa: E402
 from word_similarity_calculator import WordSimilarityCalculator  # noqa: E402
 
 # Paths
@@ -76,8 +76,8 @@ def align_pair(reference: str, hypothesis: str) -> list[dict]:
 
     Skips epsilon-to-epsilon edges; NA on the absent side for deletions/insertions.
     """
-    ref_words = [clean_word(w) for w in str(reference).split()]
-    hyp_words = [clean_word(w) for w in str(hypothesis).split()]
+    ref_words = str(reference).split()
+    hyp_words = str(hypothesis).split()
     if not ref_words or not hyp_words:
         return []
 
@@ -89,7 +89,7 @@ def align_pair(reference: str, hypothesis: str) -> list[dict]:
     )
     G = build_full_bipartite_graph(ref_words, hyp_words, calc)
     matching = solve_matching(G)
-    M = build_reduced_graph_by_matching(G, matching)  # ε↔ε pairs already removed
+    M = build_reduced_graph_by_matching(G, matching)  # epsilon-to-epsilon pairs already removed
 
     alignments: list[dict] = []
     for u, v in get_bipartite_edges(M):
@@ -98,15 +98,18 @@ def align_pair(reference: str, hypothesis: str) -> list[dict]:
 
         if u_is_eps:
             j = extract_index_from_node_name(v)
-            alignments.append(_alignment_row(None, hyp_words[j], None, j, None))
+            alignments.append(_alignment_row(None, M.nodes[v][ATTR_WORD], None, j, None))
         elif v_is_eps:
             i = extract_index_from_node_name(u)
-            alignments.append(_alignment_row(ref_words[i], None, i, None, None))
+            alignments.append(_alignment_row(M.nodes[u][ATTR_WORD], None, i, None, None))
         else:
             i = extract_index_from_node_name(u)
             j = extract_index_from_node_name(v)
             similarity = M.edges[u, v][ATTR_SIMILARITY]
-            alignments.append(_alignment_row(ref_words[i], hyp_words[j], i, j, similarity))
+
+            alignments.append(_alignment_row(
+                M.nodes[u][ATTR_WORD], M.nodes[v][ATTR_WORD], i, j, similarity
+            ))
     return alignments
 
 
@@ -119,17 +122,18 @@ def _alignment_row(reference_word, hypothesis_word, reference_index, hypothesis_
 
 
 def write_alignments(alignments: list[dict], out_path: Path) -> None:
-    """Write alignments to a zstd-compressed parquet with deterministic row order."""
+    """Write alignments to zstd-compressed parquet with deterministic row order."""
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    # `columns=` ensures the schema is set even when alignments is empty (no KeyError on sort).
     df = (
-        pd.DataFrame(alignments)
+        pd.DataFrame(alignments, columns=OUTPUT_COLUMNS)
         .sort_values(["path", "reference_index", "hypothesis_index"])
         .reset_index(drop=True)
     )
     # Nullable Int32 keeps insertion/deletion rows as proper missing values, not float NaN.
     df["reference_index"] = df["reference_index"].astype("Int32")
     df["hypothesis_index"] = df["hypothesis_index"].astype("Int32")
-    df[OUTPUT_COLUMNS].to_parquet(out_path, engine="pyarrow", compression="zstd", index=False)
+    df.to_parquet(out_path, engine="pyarrow", compression="zstd", index=False)
 
 
 def _now() -> str:
