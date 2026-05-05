@@ -94,16 +94,18 @@ def grid_search(
         for pos_mode in positional_modes
     ]
 
-    if n_jobs == 1:
+    effective_n_jobs = min(n_jobs, len(grid_points)) if grid_points else 1
+
+    if effective_n_jobs == 1:
         results = [
             _evaluate_grid_point(entries, a, l, lm, pm, global_max_word_len)
             for a, l, lm, pm in grid_points
         ]
     else:
         # entries are shipped once per worker via the initializer; map streams results in input order.
-        chunksize = max(1, len(grid_points) // (n_jobs * 4))
+        chunksize = max(1, len(grid_points) // (effective_n_jobs * 4))
         with ProcessPoolExecutor(
-                max_workers=n_jobs,
+                max_workers=effective_n_jobs,
                 initializer=_init_worker,
                 initargs=(entries, global_max_word_len),
         ) as executor:
