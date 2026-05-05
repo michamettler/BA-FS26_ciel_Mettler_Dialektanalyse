@@ -1,5 +1,6 @@
 pandas
 numpy
+pyarrow
 matplotlib
 openai-whisper
 torch
