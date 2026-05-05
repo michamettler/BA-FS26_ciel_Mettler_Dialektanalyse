@@ -2,6 +2,9 @@
 Grid search utilities for bipartite matching hyperparameter optimization.
 """
 
+import os
+from concurrent.futures import ProcessPoolExecutor, as_completed
+
 import networkx as nx
 import numpy as np
 import pandas as pd
@@ -61,7 +64,47 @@ def _ref_side_edges(M: nx.DiGraph) -> set[tuple]:
     return edges
 
 
-def grid_search(entries, alphas, lambdas, lexical_normalization_modes, positional_modes):
+def _evaluate_grid_point(
+        entries, alpha, lambda_, use_global_lexical_normalization,
+        use_squared_positional, global_max_word_len,
+):
+    """Evaluate one (alpha, lambda, lex_mode, pos_mode) point across all GT entries.
+
+    Top-level for ProcessPoolExecutor pickling.
+    """
+    accuracies = []
+    for entry in entries:
+        ref, hyp = entry["reference"], entry["hypothesis"]
+
+        similarity_calculator = WordSimilarityCalculator(
+            sent_len=max(len(ref), len(hyp)),
+            alpha=alpha, lambda_=lambda_,
+            use_global_lexical_normalization=use_global_lexical_normalization,
+            max_word_len=global_max_word_len if use_global_lexical_normalization else None,
+            use_squared_positional=use_squared_positional,
+        )
+        G = build_full_bipartite_graph(ref, hyp, similarity_calculator)
+        solver_matching = solve_matching(G)
+        gt_matching = gt_alignment_to_matching(entry["alignment"])
+
+        M_solver = build_reduced_graph_by_matching(G, solver_matching)
+        M_gt = build_reduced_graph_by_matching(G, gt_matching)
+
+        accuracies.append(evaluate_alignment(M_solver, M_gt))
+
+    return {
+        "alpha": alpha,
+        "lambda": lambda_,
+        "use_global_lexical_normalization": use_global_lexical_normalization,
+        "use_squared_positional": use_squared_positional,
+        "accuracy": float(np.mean(accuracies)),
+    }
+
+
+def grid_search(
+        entries, alphas, lambdas, lexical_normalization_modes, positional_modes,
+        n_jobs=None,
+):
     """Run grid search over all (alpha, lambda, lexical_normalization, positional) combinations.
 
     Args:
@@ -70,6 +113,7 @@ def grid_search(entries, alphas, lambdas, lexical_normalization_modes, positiona
         lambdas: lambda values for grid search.
         lexical_normalization_modes: iterable of bool; whether to normalize lexical similarity globally.
         positional_modes: iterable of bool for use_squared_positional; linear vs. squared positional decay.
+        n_jobs: number of worker processes; None = os.cpu_count(), 1 = sequential.
 
     Returns:
         DataFrame with one row per (alpha, lambda, use_global_lexical_normalization, use_squared_positional).
@@ -78,39 +122,33 @@ def grid_search(entries, alphas, lambdas, lexical_normalization_modes, positiona
         raise ValueError("grid_search() requires a non-empty 'entries' list")
     global_max_word_len = max(len(w) for entry in entries for w in entry["reference"] + entry["hypothesis"])
 
-    results = []
-    for alpha in alphas:
-        for lambda_ in lambdas:
-            for use_global_lexical_normalization in lexical_normalization_modes:
-                for use_squared_positional in positional_modes:
-                    accuracies = []
-                    for entry in entries:
-                        ref, hyp = entry["reference"], entry["hypothesis"]
+    grid_points = [
+        (alpha, lambda_, lex_mode, pos_mode)
+        for alpha in alphas
+        for lambda_ in lambdas
+        for lex_mode in lexical_normalization_modes
+        for pos_mode in positional_modes
+    ]
 
-                        similarity_calculator = WordSimilarityCalculator(
-                            sent_len=max(len(ref), len(hyp)),
-                            alpha=alpha, lambda_=lambda_,
-                            use_global_lexical_normalization=use_global_lexical_normalization,
-                            max_word_len=global_max_word_len if use_global_lexical_normalization else None,
-                            use_squared_positional=use_squared_positional,
-                        )
-                        G = build_full_bipartite_graph(ref, hyp, similarity_calculator)
-                        solver_matching = solve_matching(G)
-                        gt_matching = gt_alignment_to_matching(entry["alignment"])
+    if n_jobs is None:
+        n_jobs = os.cpu_count() or 1
 
-                        M_solver = build_reduced_graph_by_matching(G, solver_matching)
-                        M_gt = build_reduced_graph_by_matching(G, gt_matching)
+    if n_jobs == 1:
+        results = [
+            _evaluate_grid_point(entries, a, l, lm, pm, global_max_word_len)
+            for a, l, lm, pm in grid_points
+        ]
+    else:
+        with ProcessPoolExecutor(max_workers=n_jobs) as executor:
+            futures = [
+                executor.submit(_evaluate_grid_point, entries, a, l, lm, pm, global_max_word_len)
+                for a, l, lm, pm in grid_points
+            ]
+            results = [f.result() for f in as_completed(futures)]
 
-                        accuracies.append(evaluate_alignment(M_solver, M_gt))
-
-                    results.append({
-                        "alpha": alpha,
-                        "lambda": lambda_,
-                        "use_global_lexical_normalization": use_global_lexical_normalization,
-                        "use_squared_positional": use_squared_positional,
-                        "accuracy": np.mean(accuracies),
-                    })
-    return pd.DataFrame(results)
+    return pd.DataFrame(results).sort_values(
+        ["use_global_lexical_normalization", "use_squared_positional", "alpha", "lambda"]
+    ).reset_index(drop=True)
 
 
 def pivot_accuracy_grids(df, alphas=None, lambdas=None):
