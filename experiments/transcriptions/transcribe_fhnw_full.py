@@ -216,12 +216,12 @@ def delete_checkpoint(split: str):
 # ── final output ─────────────────────────────────────────────────────────────
 def save_final(df: pd.DataFrame, completed: dict[str, str], split: str):
     df = df.copy()
-    df["transcript"] = df["path"].map(completed).fillna("ERROR: NOT TRANSCRIBED")
+    df["fhnw_transcript"] = df["path"].map(completed).fillna("ERROR: NOT TRANSCRIBED")
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     output_path = OUTPUT_DIR / f"fhnw_{split}.tsv"
     df.to_csv(output_path, sep="\t", index=False, encoding="utf-8-sig")
 
-    errors = int(df["transcript"].str.startswith("ERROR").sum())
+    errors = int(df["fhnw_transcript"].str.startswith("ERROR").sum())
     ok = len(df) - errors
     print(f"  Saved: {output_path}")
     print(f"  Total: {len(df)}  |  Success: {ok}  |  Errors: {errors}")

@@ -48,11 +48,11 @@ def _load_joined() -> pd.DataFrame:
     """Join dit + dat on the path stem (dit stores .flac, dat stores .mp3 — only
     the dat extension exists on disk, so the dat path is kept as canonical)."""
     dit = pd.read_csv(DIT_TSV, sep="\t", encoding="utf-8-sig")
-    dat = pd.read_csv(DAT_TSV, sep="\t", encoding="utf-8-sig")[["path", "transcript"]]
+    dat = pd.read_csv(DAT_TSV, sep="\t", encoding="utf-8-sig")[["path", "fhnw_transcript"]]
     dit["_stem"] = dit["path"].map(_path_stem)
     dat["_stem"] = dat["path"].map(_path_stem)
     dit = dit.drop(columns=["path"])
-    dat = dat.rename(columns={"transcript": "dat_transcript"})
+    dat = dat.rename(columns={"fhnw_transcript": "dat_transcript"})
     df = dit.merge(dat, on="_stem", how="left").drop(columns=["_stem"])
     return df[
         (df["clip_is_usable"] == True)
