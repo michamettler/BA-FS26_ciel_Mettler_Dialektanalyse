@@ -178,7 +178,7 @@ def process_batch(tasks: list[tuple]) -> list[dict]:
 def run_alignments_in_parallel(tasks: list[tuple], n_workers: int) -> list[dict]:
     """Distribute tasks across workers; aggregate alignments with periodic progress."""
     chunks = chunk_worklist(tasks, n_workers * 8)
-    print(f"  dispatching {len(tasks):,} alignments across {len(chunks)} batches × {n_workers} workers")
+    print(f"  dispatching {len(tasks):,} sentence pairs across {len(chunks)} batches × {n_workers} workers")
 
     out: list[dict] = []
     log_interval = max(1, len(chunks) // 20)
