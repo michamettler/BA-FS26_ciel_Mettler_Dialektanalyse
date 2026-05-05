@@ -2,8 +2,7 @@
 Grid search utilities for bipartite matching hyperparameter optimization.
 """
 
-import os
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor
 
 import networkx as nx
 import numpy as np
@@ -64,6 +63,106 @@ def _ref_side_edges(M: nx.DiGraph) -> set[tuple]:
     return edges
 
 
+def grid_search(
+        entries, alphas, lambdas, lexical_normalization_modes, positional_modes,
+        n_jobs=1,
+):
+    """Run grid search over all (alpha, lambda, lexical_normalization, positional) combinations.
+
+    Args:
+        entries: ground-truth entries (each with reference, hypothesis, alignment).
+        alphas: alpha values for grid search.
+        lambdas: lambda values for grid search.
+        lexical_normalization_modes: iterable of bool; whether to normalize lexical similarity globally.
+        positional_modes: iterable of bool for use_squared_positional; linear vs. squared positional decay.
+        n_jobs: positive int; number of worker processes (1 = sequential, opt in to parallelism explicitly).
+
+    Returns:
+        DataFrame with one row per (alpha, lambda, use_global_lexical_normalization, use_squared_positional).
+    """
+    if not entries:
+        raise ValueError("grid_search() requires a non-empty 'entries' list")
+    if not isinstance(n_jobs, int) or isinstance(n_jobs, bool) or n_jobs < 1:
+        raise ValueError(f"n_jobs must be a positive int, got {n_jobs!r}")
+    global_max_word_len = max(len(w) for entry in entries for w in entry["reference"] + entry["hypothesis"])
+
+    grid_points = [
+        (alpha, lambda_, lex_mode, pos_mode)
+        for alpha in alphas
+        for lambda_ in lambdas
+        for lex_mode in lexical_normalization_modes
+        for pos_mode in positional_modes
+    ]
+
+    if n_jobs == 1:
+        results = [
+            _evaluate_grid_point(entries, a, l, lm, pm, global_max_word_len)
+            for a, l, lm, pm in grid_points
+        ]
+    else:
+        # entries are shipped once per worker via the initializer; map streams results in input order.
+        chunksize = max(1, len(grid_points) // (n_jobs * 4))
+        with ProcessPoolExecutor(
+                max_workers=n_jobs,
+                initializer=_init_worker,
+                initargs=(entries, global_max_word_len),
+        ) as executor:
+            results = list(executor.map(_evaluate_grid_point_worker, grid_points, chunksize=chunksize))
+
+    return pd.DataFrame(results).sort_values(
+        ["use_global_lexical_normalization", "use_squared_positional", "alpha", "lambda"]
+    ).reset_index(drop=True)
+
+
+def pivot_accuracy_grids(df, alphas=None, lambdas=None):
+    """Pivot a grid search DataFrame into 2D accuracy grids keyed by mode combinations.
+
+    Returns a dict:
+        - Key: (use_global_lexical_normalization, use_squared_positional) tuples
+        - Value: a 2D ndarray of shape (len(alphas), len(lambdas))
+    """
+    alpha_order = list(alphas) if alphas is not None else sorted(df["alpha"].unique())
+    lambda_order = list(lambdas) if lambdas is not None else sorted(df["lambda"].unique())
+
+    facets = ["use_global_lexical_normalization", "use_squared_positional"]
+    grids = {}
+    for key, subset in df.groupby(facets, sort=True):
+        pivoted = subset.pivot(index="alpha", columns="lambda", values="accuracy")
+        pivoted = pivoted.reindex(index=alpha_order, columns=lambda_order)
+        grids[key] = pivoted.to_numpy()
+    return grids
+
+
+def print_best_accuracy_summary(df, label=""):
+    """Print the best accuracy and the tied alpha/lambda values for a grid search DataFrame."""
+    best_accuracy = df["accuracy"].max()
+    tied = df[df["accuracy"] == best_accuracy]
+    tied_alphas = sorted(tied["alpha"].unique())
+    tied_lambdas = sorted(tied["lambda"].unique())
+    print(f"{label}Best accuracy = {best_accuracy:.5f} ({len(tied)} tied)")
+    print(f"  α tied: {[f'{a:.2f}' for a in tied_alphas]}")
+    print(f"  λ tied: {[f'{l:.2f}' for l in tied_lambdas]}")
+
+
+# --- Parallelization Code ---
+
+_WORKER_ENTRIES = None
+_WORKER_GLOBAL_MAX_WORD_LEN = None
+
+
+def _init_worker(entries, global_max_word_len):
+    global _WORKER_ENTRIES, _WORKER_GLOBAL_MAX_WORD_LEN
+    _WORKER_ENTRIES = entries
+    _WORKER_GLOBAL_MAX_WORD_LEN = global_max_word_len
+
+
+def _evaluate_grid_point_worker(grid_point):
+    alpha, lambda_, lex_mode, pos_mode = grid_point
+    return _evaluate_grid_point(
+        _WORKER_ENTRIES, alpha, lambda_, lex_mode, pos_mode, _WORKER_GLOBAL_MAX_WORD_LEN,
+    )
+
+
 def _evaluate_grid_point(
         entries, alpha, lambda_, use_global_lexical_normalization,
         use_squared_positional, global_max_word_len,
@@ -99,83 +198,3 @@ def _evaluate_grid_point(
         "use_squared_positional": use_squared_positional,
         "accuracy": float(np.mean(accuracies)),
     }
-
-
-def grid_search(
-        entries, alphas, lambdas, lexical_normalization_modes, positional_modes,
-        n_jobs=None,
-):
-    """Run grid search over all (alpha, lambda, lexical_normalization, positional) combinations.
-
-    Args:
-        entries: ground-truth entries (each with reference, hypothesis, alignment).
-        alphas: alpha values for grid search.
-        lambdas: lambda values for grid search.
-        lexical_normalization_modes: iterable of bool; whether to normalize lexical similarity globally.
-        positional_modes: iterable of bool for use_squared_positional; linear vs. squared positional decay.
-        n_jobs: number of worker processes; None = os.cpu_count(), 1 = sequential.
-
-    Returns:
-        DataFrame with one row per (alpha, lambda, use_global_lexical_normalization, use_squared_positional).
-    """
-    if not entries:
-        raise ValueError("grid_search() requires a non-empty 'entries' list")
-    global_max_word_len = max(len(w) for entry in entries for w in entry["reference"] + entry["hypothesis"])
-
-    grid_points = [
-        (alpha, lambda_, lex_mode, pos_mode)
-        for alpha in alphas
-        for lambda_ in lambdas
-        for lex_mode in lexical_normalization_modes
-        for pos_mode in positional_modes
-    ]
-
-    if n_jobs is None:
-        n_jobs = os.cpu_count() or 1
-
-    if n_jobs == 1:
-        results = [
-            _evaluate_grid_point(entries, a, l, lm, pm, global_max_word_len)
-            for a, l, lm, pm in grid_points
-        ]
-    else:
-        with ProcessPoolExecutor(max_workers=n_jobs) as executor:
-            futures = [
-                executor.submit(_evaluate_grid_point, entries, a, l, lm, pm, global_max_word_len)
-                for a, l, lm, pm in grid_points
-            ]
-            results = [f.result() for f in as_completed(futures)]
-
-    return pd.DataFrame(results).sort_values(
-        ["use_global_lexical_normalization", "use_squared_positional", "alpha", "lambda"]
-    ).reset_index(drop=True)
-
-
-def pivot_accuracy_grids(df, alphas=None, lambdas=None):
-    """Pivot a grid search DataFrame into 2D accuracy grids keyed by mode combinations.
-
-    Returns a dict:
-        - Key: (use_global_lexical_normalization, use_squared_positional) tuples
-        - Value: a 2D ndarray of shape (len(alphas), len(lambdas))
-    """
-    alpha_order = list(alphas) if alphas is not None else sorted(df["alpha"].unique())
-    lambda_order = list(lambdas) if lambdas is not None else sorted(df["lambda"].unique())
-
-    facets = ["use_global_lexical_normalization", "use_squared_positional"]
-    grids = {}
-    for key, subset in df.groupby(facets, sort=True):
-        pivoted = subset.pivot(index="alpha", columns="lambda", values="accuracy")
-        pivoted = pivoted.reindex(index=alpha_order, columns=lambda_order)
-        grids[key] = pivoted.to_numpy()
-    return grids
-
-
-def print_best_accuracy_summary(df, label=""):
-    """Print the best accuracy and the tied alpha/lambda values for a grid search DataFrame."""
-    best_accuracy = df["accuracy"].max()
-    tied = df[df["accuracy"] == best_accuracy]
-    tied_alphas = sorted(tied["alpha"].unique())
-    tied_lambdas = sorted(tied["lambda"].unique())
-    print(f"{label}Best accuracy = {best_accuracy:.5f} ({len(tied)} tied)")
-    print(f"  α tied: {[f'{a:.2f}' for a in tied_alphas]}")
-    print(f"  λ tied: {[f'{l:.2f}' for l in tied_lambdas]}")
