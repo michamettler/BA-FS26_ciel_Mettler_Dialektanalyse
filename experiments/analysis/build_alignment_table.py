@@ -32,6 +32,7 @@ from bipartite_matching import (  # noqa: E402
     solve_matching,
 )
 from word_similarity_calculator import WordSimilarityCalculator  # noqa: E402
+from preprocessing import clean_word  # noqa: E402
 
 # Paths
 DAT_TSV = PROJECT_ROOT / "transcripts" / "dialect-aware" / "fhnw" / "stt4sg" / "train_all_transcribed.tsv"
@@ -71,14 +72,18 @@ def load_and_filter() -> pd.DataFrame:
     return df.reset_index(drop=True)
 
 
+def _tokenize(text: str) -> list[str]:
+    return [w for w in clean_word(text).split() if w]
+
+
 def align_pair(reference: str, hypothesis: str) -> list[dict]:
     """Run the calibrated solver on one ref/hyp pair, return one alignment per real-word edge.
 
     Skips epsilon-to-epsilon edges; NA on the absent side for deletions/insertions.
     """
-    ref_words = str(reference).split()
-    hyp_words = str(hypothesis).split()
-    if not ref_words or not hyp_words:
+    ref_words = _tokenize(reference)
+    hyp_words = _tokenize(hypothesis)
+    if not ref_words and not hyp_words:
         return []
 
     calc = WordSimilarityCalculator(
