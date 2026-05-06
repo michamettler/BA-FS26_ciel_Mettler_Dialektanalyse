@@ -141,6 +141,17 @@ def write_alignments(alignments: list[dict], out_path: Path) -> None:
     df.to_parquet(out_path, engine="pyarrow", compression="zstd", index=False)
 
 
+def align_and_write(
+        df: pd.DataFrame, hyp_col: str, out_path: Path, label: str, n_workers: int,
+) -> None:
+    """Align reference vs. one model's hypothesis and write the resulting parquet."""
+    tasks = list(zip(df["path"], df["sentence"], df[hyp_col]))
+    alignments = run_alignments_in_parallel(tasks, n_workers)
+    write_alignments(alignments, out_path)
+    size_mb = out_path.stat().st_size / 1e6
+    print(f"Wrote {out_path.name}: {len(alignments):,} {label} alignments ({size_mb:.0f} MB)")
+
+
 def _now() -> str:
     return datetime.now().strftime("%H:%M:%S")
 
@@ -153,15 +164,8 @@ def main() -> None:
     df = load_and_filter()
     print(f"Filtered to {len(df):,} sentence pairs")
 
-    for hyp_col, out_path, label in [
-        (DAT_HYP_COL, DAT_OUT, "dialect-aware"),
-        (DIT_HYP_COL, DIT_OUT, "dialect-ignorant"),
-    ]:
-        tasks = list(zip(df["path"], df["sentence"], df[hyp_col]))
-        alignments = run_alignments_in_parallel(tasks, n_workers)
-        write_alignments(alignments, out_path)
-        size_mb = out_path.stat().st_size / 1e6
-        print(f"Wrote {out_path.name}: {len(alignments):,} {label} alignments ({size_mb:.0f} MB)")
+    align_and_write(df, DAT_HYP_COL, DAT_OUT, "dialect-aware", n_workers)
+    align_and_write(df, DIT_HYP_COL, DIT_OUT, "dialect-ignorant", n_workers)
 
     runtime = time.perf_counter() - t0
     print(f"[{_now()}] done in {runtime:.1f}s on {n_workers} workers")
