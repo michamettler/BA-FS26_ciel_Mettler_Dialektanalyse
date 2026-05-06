@@ -13,3 +13,5 @@ levenshtein
 transformers
 seaborn
 rich
+streamlit
+wordcloud
