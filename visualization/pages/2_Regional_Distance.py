@@ -44,10 +44,10 @@ def per_sentence_cost() -> pd.DataFrame:
 
 
 @st.cache_data
-def regional_summary(exclude_praet: bool) -> pd.DataFrame:
+def regional_summary(include_praet: bool) -> pd.DataFrame:
     """Per-region mean cost (DAT, DIT), DIT−DAT delta, n. Sorted by delta desc."""
     df = per_sentence_cost()
-    if exclude_praet:
+    if not include_praet:
         df = df[~df["is_praeteritum"].fillna(False).astype(bool)]
 
     summary = (
@@ -82,13 +82,23 @@ st.markdown(
     "Regions sorted by delta (descending)."
 )
 
-exclude_praet = st.sidebar.toggle("Exclude Präteritum sentences", value=True)
+include_praet = st.sidebar.toggle("Include Präteritum sentences", value=False,
+                                  help="Off by default: Präteritum avoidance is a Swiss-German-wide "
+                                       "feature, so it lifts every region's delta similarly and "
+                                       "confounds the regional ranking. Toggle on for a 'total dialect "
+                                       "distance' view.")
 
 with st.spinner("Computing per-sentence alignment costs…"):
-    summary = regional_summary(exclude_praet)
+    summary = regional_summary(include_praet)
     per_sentence = per_sentence_cost()
-    if exclude_praet:
+    if not include_praet:
         per_sentence = per_sentence[~per_sentence["is_praeteritum"].fillna(False).astype(bool)]
+
+# Sidebar at-a-glance counts (alignment rows behind the per-sentence aggregates + sentence count).
+align_in_view = load_alignments()
+align_in_view = align_in_view[align_in_view["path"].isin(set(per_sentence["path"]))]
+st.sidebar.metric("Rows in view", f"{len(align_in_view):,}")
+st.sidebar.metric("Unique sentences", f"{per_sentence['path'].nunique():,}")
 
 regions_sorted = summary["dialect_region"].tolist()
 model_scale = alt.Scale(

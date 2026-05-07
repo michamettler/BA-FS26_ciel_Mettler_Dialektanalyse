@@ -115,6 +115,8 @@ def plot_reduced_bipartite_graph_with_matching(
 
     The reduced graph only shows the matching edges (ref -> hyp), and the source/sink edges.
     Epsilon-to-epsilon matches are excluded for clarity.
+
+    Returns the Figure so callers (notebook, Streamlit) can render or persist it.
     """
     # color map to visualize scores
     cmap = mcolors.LinearSegmentedColormap.from_list(
@@ -192,7 +194,7 @@ def plot_reduced_bipartite_graph_with_matching(
     fig.colorbar(score_colorbar, ax=ax, fraction=0.03, pad=0.04).set_label("Similarity", fontsize=10)
 
     plt.tight_layout()
-    plt.show()
+    return fig
 
 
 def plot_similarity_distribution(data, title):
