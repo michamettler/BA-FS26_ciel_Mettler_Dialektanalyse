@@ -14,4 +14,5 @@ transformers
 seaborn
 rich
 streamlit
+streamlit-echarts
 wordcloud

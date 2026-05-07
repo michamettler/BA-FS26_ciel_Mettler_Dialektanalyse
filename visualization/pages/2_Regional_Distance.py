@@ -9,10 +9,9 @@ sample-size-balanced subset of train_all) so per-region samples are comparable.
 import sys
 from pathlib import Path
 
-import matplotlib.pyplot as plt
+import altair as alt
 import numpy as np
 import pandas as pd
-import seaborn as sns
 import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -45,9 +44,12 @@ def per_sentence_cost() -> pd.DataFrame:
 
 
 @st.cache_data
-def regional_summary() -> pd.DataFrame:
-    """Per-region mean cost (DAT, DIT), DIT−DAT delta, and sample size."""
+def regional_summary(exclude_praet: bool) -> pd.DataFrame:
+    """Per-region mean cost (DAT, DIT), DIT−DAT delta, n. Sorted by delta desc."""
     df = per_sentence_cost()
+    if exclude_praet:
+        df = df[~df["is_praeteritum"].fillna(False).astype(bool)]
+
     summary = (
         df.groupby(["dialect_region", "model"], observed=True)
         .agg(mean_cost=("cost_per_ref_word", "mean"),
@@ -64,7 +66,8 @@ def regional_summary() -> pd.DataFrame:
         "delta (DIT − DAT)": pivoted[("mean_cost", "dialect-ignorant")] - pivoted[("mean_cost", "dialect-aware")],
         "n sentences": pivoted[("n_sentences", "dialect-aware")].astype(int),
     })
-    return out.reindex([r for r in REGIONS if r in out.index]).reset_index()
+    # Default ordering: dialect signal strongest first.
+    return out.sort_values("delta (DIT − DAT)", ascending=False).reset_index()
 
 
 # ── Page ──────────────────────────────────────────────────────────────────────
@@ -75,40 +78,76 @@ st.markdown(
     "Aggregate dialect distance per region, measured as mean per-sentence alignment cost "
     f"(substitution: 1 − sim; ε rows: λ = {LAMBDA}) divided by reference word count. "
     "Computed on the **train_balanced** subset (~25k sentences per region; subset of train_all). "
-    "Lower cost = closer to Hochdeutsch; higher DIT − DAT delta = stronger dialect signal."
+    "Lower cost = closer to Hochdeutsch; higher DIT − DAT delta = stronger dialect signal. "
+    "Regions sorted by delta (descending)."
 )
 
+exclude_praet = st.sidebar.toggle("Exclude Präteritum sentences", value=True)
+
 with st.spinner("Computing per-sentence alignment costs…"):
-    summary = regional_summary()
+    summary = regional_summary(exclude_praet)
     per_sentence = per_sentence_cost()
+    if exclude_praet:
+        per_sentence = per_sentence[~per_sentence["is_praeteritum"].fillna(False).astype(bool)]
 
-# ── Headline plots ───────────────────────────────────────────────────────────
-fig, axes = plt.subplots(2, 1, figsize=(12, 6.5), gridspec_kw={"height_ratios": [3, 2]})
+regions_sorted = summary["dialect_region"].tolist()
+model_scale = alt.Scale(
+    domain=["dialect-aware", "dialect-ignorant"],
+    range=[DAT_COLOR, DIT_COLOR],
+)
 
-regions = summary["dialect_region"].tolist()
-x = np.arange(len(regions))
-w = 0.4
+# ── Headline plots: paired bars + delta bar (Altair, vertically stacked) ────
+long_summary = summary.melt(
+    id_vars=["dialect_region"],
+    value_vars=["DAT cost", "DIT cost"],
+    var_name="model_label",
+    value_name="cost",
+)
+long_summary["model"] = long_summary["model_label"].map(
+    {"DAT cost": "dialect-aware", "DIT cost": "dialect-ignorant"}
+)
 
-axes[0].bar(x - w / 2, summary["DAT cost"], width=w, label="DAT", color=DAT_COLOR, alpha=0.9)
-axes[0].bar(x + w / 2, summary["DIT cost"], width=w, label="DIT", color=DIT_COLOR, alpha=0.9)
-axes[0].set_xticks(x)
-axes[0].set_xticklabels(regions)
-axes[0].set_ylabel("Mean cost per ref word")
-axes[0].set_title("Mean alignment cost per region")
-axes[0].legend(loc="upper right")
-axes[0].grid(axis="y", alpha=0.3)
+paired_chart = (
+    alt.Chart(long_summary)
+    .mark_bar(opacity=0.9)
+    .encode(
+        x=alt.X("dialect_region:N", sort=regions_sorted, title=None,
+                axis=alt.Axis(labelAngle=0, labelOverlap=False)),
+        y=alt.Y("cost:Q", title="Mean cost per ref word"),
+        color=alt.Color("model:N", scale=model_scale, legend=alt.Legend(title=None)),
+        xOffset=alt.XOffset("model:N"),
+        tooltip=[
+            alt.Tooltip("dialect_region:N", title="Region"),
+            alt.Tooltip("model:N", title="Model"),
+            alt.Tooltip("cost:Q", format=".4f", title="Cost"),
+        ],
+    )
+    .properties(height=300, title="Mean alignment cost per region")
+)
 
-axes[1].bar(x, summary["delta (DIT − DAT)"], color=DIT_COLOR, alpha=0.9)
-axes[1].set_xticks(x)
-axes[1].set_xticklabels(regions)
-axes[1].axhline(0, color="black", linewidth=0.6)
-axes[1].set_ylabel("DIT − DAT")
-axes[1].set_title("Dialect-specific distance per region (positive = DIT pays more cost than DAT)")
-axes[1].grid(axis="y", alpha=0.3)
+delta_chart = (
+    alt.Chart(summary)
+    .mark_bar(opacity=0.9)
+    .encode(
+        x=alt.X("dialect_region:N", sort=regions_sorted, title=None,
+                axis=alt.Axis(labelAngle=0, labelOverlap=False)),
+        y=alt.Y("delta (DIT − DAT):Q", title="DIT − DAT"),
+        color=alt.condition(
+            alt.datum["delta (DIT − DAT)"] >= 0,
+            alt.value(DIT_COLOR),
+            alt.value(DAT_COLOR),
+        ),
+        tooltip=[
+            alt.Tooltip("dialect_region:N", title="Region"),
+            alt.Tooltip("delta (DIT − DAT):Q", format=".4f", title="Delta"),
+            alt.Tooltip("n sentences:Q", title="N sentences"),
+        ],
+    )
+    .properties(height=220, title="Dialect-specific distance per region (positive = DIT pays more)")
+)
+zero = alt.Chart(pd.DataFrame({"y": [0]})).mark_rule(strokeWidth=0.6, color="black").encode(y="y:Q")
 
-plt.tight_layout()
-st.pyplot(fig)
-plt.close(fig)
+st.altair_chart(alt.vconcat(paired_chart, delta_chart + zero), use_container_width=True)
 
 # ── Table ────────────────────────────────────────────────────────────────────
 st.markdown("### Per-region summary")
@@ -120,23 +159,39 @@ st.dataframe(display_table, hide_index=True, use_container_width=True)
 # ── Distribution ─────────────────────────────────────────────────────────────
 st.markdown("### Per-sentence cost distribution")
 st.caption(
-    "Each box shows the within-region distribution of per-sentence alignment cost. "
-    "Wide IQR = mixed dialect compliance across speakers; tight = consistent."
+    "Each box: within-region distribution of per-sentence alignment cost. "
+    "Whiskers span 5th–95th percentile; box is q1–q3; tick is the median. "
+    "Wide IQR = mixed dialect compliance across speakers."
 )
-fig, ax = plt.subplots(figsize=(12, 4))
-sns.boxplot(
-    data=per_sentence,
-    x="dialect_region", y="cost_per_ref_word",
-    hue="model", order=regions,
-    hue_order=["dialect-aware", "dialect-ignorant"],
-    palette={"dialect-aware": DAT_COLOR, "dialect-ignorant": DIT_COLOR},
-    ax=ax,
-    fliersize=2,
+
+# Aggregate to box stats server-side (avoids Vega-Lite max_rows on 343k rows
+# and the xOffset/compound-mark friction with mark_boxplot).
+def _box_stats(df: pd.DataFrame) -> pd.DataFrame:
+    out = []
+    for (region, model), grp in df.groupby(["dialect_region", "model"], observed=True):
+        v = grp["cost_per_ref_word"]
+        out.append({
+            "dialect_region": region, "model": model,
+            "min": v.quantile(0.05), "q1": v.quantile(0.25),
+            "median": v.median(),
+            "q3": v.quantile(0.75), "max": v.quantile(0.95),
+        })
+    return pd.DataFrame(out)
+
+
+box_stats = _box_stats(per_sentence)
+
+base = alt.Chart(box_stats).encode(
+    x=alt.X("dialect_region:N", sort=regions_sorted, title=None,
+            axis=alt.Axis(labelAngle=0, labelOverlap=False)),
+    color=alt.Color("model:N", scale=model_scale, legend=alt.Legend(title=None)),
+    xOffset=alt.XOffset("model:N"),
 )
-ax.set_xlabel("")
-ax.set_ylabel("Cost per ref word")
-ax.legend(title="", loc="upper right")
-ax.grid(axis="y", alpha=0.3)
-plt.tight_layout()
-st.pyplot(fig)
-plt.close(fig)
+whisker = base.mark_rule(strokeWidth=1.5).encode(
+    y=alt.Y("min:Q", title="Cost per ref word"),
+    y2="max:Q",
+)
+box = base.mark_bar(size=22, opacity=0.9).encode(y="q1:Q", y2="q3:Q")
+median_tick = base.mark_tick(thickness=2.5, color="black", size=22).encode(y="median:Q")
+
+st.altair_chart((whisker + box + median_tick).properties(height=380), use_container_width=True)

@@ -31,10 +31,12 @@ def load_alignments() -> pd.DataFrame:
 
 @st.cache_data
 def load_metadata() -> pd.DataFrame:
-    """Slim per-sentence frame: region/speaker metadata + reference + both hypotheses."""
+    """Slim per-sentence frame: region/speaker metadata + reference + both hypotheses + tense flag."""
     dat_cols = ["path", "dialect_region", "client_id", "gender", "age", "canton", "sentence", "fhnw_transcript"]
     dat = pd.read_csv(DAT_TSV, sep="\t", encoding="utf-8-sig")[dat_cols]
-    dit = pd.read_csv(DIT_TSV, sep="\t", encoding="utf-8-sig")[["path", "whisper_large_v2_transcript"]]
+    dit = pd.read_csv(DIT_TSV, sep="\t", encoding="utf-8-sig")[
+        ["path", "whisper_large_v2_transcript", "is_praeteritum"]
+    ]
     return dat.merge(dit, on="path", how="left").rename(columns={
         "sentence": "reference",
         "fhnw_transcript": "dat_hypothesis",
@@ -53,5 +55,7 @@ def joined_view(regions: tuple[str, ...]) -> pd.DataFrame:
 
 @st.cache_data
 def load_balanced_paths() -> pd.DataFrame:
-    """train_balanced.tsv: per-region count-balanced subset of train_all (path + region only)."""
-    return pd.read_csv(BALANCED_TSV, sep="\t", encoding="utf-8-sig")[["path", "dialect_region"]]
+    """train_balanced.tsv joined with the praeteritum flag (path, region, is_praeteritum)."""
+    balanced = pd.read_csv(BALANCED_TSV, sep="\t", encoding="utf-8-sig")[["path", "dialect_region"]]
+    praet = pd.read_csv(DIT_TSV, sep="\t", encoding="utf-8-sig", usecols=["path", "is_praeteritum"])
+    return balanced.merge(praet, on="path", how="left")
