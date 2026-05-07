@@ -5,14 +5,21 @@ Similarity calculation for dialect analysis.
 import Levenshtein
 
 # Scale factor: network simplex requires integer weights, so float costs are scaled to ints.
-_COST_SCALE = 1000
+COST_SCALE = 1000
 
 
-def cost_for_word_pair_by_similarity(similarity: float) -> int:
-    """Convert a similarity to an integer cost for the network flow algorithm.
-    Cost = (1 - similarity) * _COST_SCALE, rounded to the nearest integer.
+def cost_for_word_pair_by_similarity(similarity: float) -> float:
+    """Convert a similarity to a cost.
+    Cost = (1 - similarity).
     """
-    return round((1 - similarity) * _COST_SCALE)
+    return 1 - similarity
+
+
+def scale_cost_for_networkx(cost: float) -> int:
+    """Convert the theoretical cost to an integer cost for the network flow algorithm.
+    Cost = cost * COST_SCALE, rounded to the nearest integer.
+    """
+    return round(cost * COST_SCALE)
 
 
 class WordSimilarityCalculator:
@@ -112,7 +119,5 @@ class WordSimilarityCalculator:
         return 1.0
 
     def cost_for_epsilon_by_penalty(self) -> int:
-        """Convert an epsilon penalty to an integer cost for the network flow algorithm.
-
-        Cost = penalty (lambda_) * _COST_SCALE, rounded to the nearest integer."""
-        return round(self.lambda_ * _COST_SCALE)
+        """Convert an epsilon penalty to an integer cost for the network flow algorithm."""
+        return scale_cost_for_networkx(self.lambda_)

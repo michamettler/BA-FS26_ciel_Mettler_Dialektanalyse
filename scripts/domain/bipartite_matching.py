@@ -1,6 +1,7 @@
 import networkx as nx
 
-from word_similarity_calculator import WordSimilarityCalculator, cost_for_word_pair_by_similarity
+from word_similarity_calculator import WordSimilarityCalculator, cost_for_word_pair_by_similarity, \
+    scale_cost_for_networkx
 from preprocessing import clean_word
 
 EPS = "ε"  # epsilon symbol, used for unmatched padding nodes
@@ -13,6 +14,7 @@ HYPOTHESIS_PARTITION = "hyp"
 ATTR_WORD = "word"
 ATTR_PARTITION = "partition"
 ATTR_SIMILARITY = "similarity"  # float for word-word edges, None for epsilon routing edges
+ATTR_WEIGHT = "weight"  # int network-flow cost: round((1 − similarity) * _COST_SCALE) for substitutions or epsilon
 
 
 def build_full_bipartite_graph(
@@ -83,7 +85,9 @@ def build_full_bipartite_graph(
                 hyp_word=hyp_words[j],
                 hyp_position=j,
             )
-            cost = cost_for_word_pair_by_similarity(similarity)
+            cost = scale_cost_for_networkx(
+                cost_for_word_pair_by_similarity(similarity)
+            )
 
             G.add_edge(
                 get_node_name(REFERENCE_PARTITION, i),
@@ -140,7 +144,7 @@ def solve_matching(G: nx.DiGraph) -> dict[str, str]:
     Returns:
         Mapping of reference word nodes to hypothesis word nodes, representing the optimal matching.
     """
-    flow_dict = nx.min_cost_flow(G, weight="weight")  # TODO hungarian as alternative
+    flow_dict = nx.min_cost_flow(G, weight=ATTR_WEIGHT)
 
     # Extract matching: for each node r in R', find the matched node h in H' with flow=1
     matching = {}
@@ -177,12 +181,13 @@ def build_reduced_graph_by_matching(G: nx.DiGraph, matching: dict[str, str]) -> 
             continue
 
         M.add_node(r, word=G.nodes[r][ATTR_WORD], partition=REFERENCE_PARTITION)
-        M.add_edge(SOURCE_NODE, r, similarity=None)
+        M.add_edge(SOURCE_NODE, r, similarity=None, weight=0)
         M.add_node(h, word=G.nodes[h][ATTR_WORD], partition=HYPOTHESIS_PARTITION)
-        M.add_edge(h, SINK_NODE, similarity=None)
+        M.add_edge(h, SINK_NODE, similarity=None, weight=0)
 
         similarity = G.edges[r, h].get(ATTR_SIMILARITY)
-        M.add_edge(r, h, similarity=similarity)
+        cost = G.edges[r, h].get(ATTR_WEIGHT)
+        M.add_edge(r, h, similarity=similarity, weight=cost)
 
     return M
 

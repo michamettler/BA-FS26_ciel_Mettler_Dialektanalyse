@@ -1,10 +1,15 @@
 """Shared data layer for the Streamlit visualization pages."""
+import sys
 from pathlib import Path
 
 import pandas as pd
 import streamlit as st
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(PROJECT_ROOT / "scripts" / "domain"))
+
+from word_similarity_calculator import cost_for_word_pair_by_similarity  # noqa: E402, F401
+
 ALIGN_DIR = PROJECT_ROOT / "experiments" / "analysis"
 DAT_PARQUET = ALIGN_DIR / "train_all_alignments_dialect-aware.parquet"
 DIT_PARQUET = ALIGN_DIR / "train_all_alignments_dialect-ignorant.parquet"

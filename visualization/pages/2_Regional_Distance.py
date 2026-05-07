@@ -10,13 +10,13 @@ import sys
 from pathlib import Path
 
 import altair as alt
-import numpy as np
 import pandas as pd
 import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from _data import (  # noqa: E402
     DAT_COLOR, DIT_COLOR, LAMBDA, REGIONS,
+    cost_for_word_pair_by_similarity,
     load_alignments, load_balanced_paths,
 )
 
@@ -29,8 +29,8 @@ def per_sentence_cost() -> pd.DataFrame:
 
     align = load_alignments()
     align = align[align["path"].isin(balanced_paths)].copy()
-    align["cost"] = np.where(align["similarity"].notna(), 1 - align["similarity"], LAMBDA)
     align["is_ref"] = align["reference_word"].notna()
+    align["cost"] = cost_for_word_pair_by_similarity(align["similarity"]).fillna(LAMBDA)
 
     grouped = (
         align.groupby(["path", "model"], observed=True)
