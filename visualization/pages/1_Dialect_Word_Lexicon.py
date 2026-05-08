@@ -101,7 +101,7 @@ def _back_to_cloud():
 
 
 def _render_overview(df: pd.DataFrame, min_count_threshold: int) -> None:
-    """Word cloud of best dialect-candidate ref words: highest mean DAT − DIT similarity delta."""
+    """Word cloud of best dialect-candidate ref words: highest mean delta (DAT sim − DIT sim)."""
     st.markdown("### Dialect-distinctive vocabulary")
     st.caption(
         "Reference words ranked by **mean DAT sim − mean DIT sim** (similarity delta) "
@@ -162,18 +162,17 @@ def _render_overview(df: pd.DataFrame, min_count_threshold: int) -> None:
     with st.expander("Top dialect-candidate words"):
         display = pd.DataFrame({
             "word": top.index,
-            "delta": top.round(3).values,
             "count": [int(counts[w]) for w in top.index],
             "DAT sim": [round(sim.loc[w, "dialect-aware"], 3) for w in top.index],
             "DIT sim": [round(sim.loc[w, "dialect-ignorant"], 3) for w in top.index],
+            "delta (DAT sim − DIT sim)": top.round(3).values,
         })
         st.dataframe(display, use_container_width=True, hide_index=True)
 
 
 def _hypothesis_table(slice_df: pd.DataFrame) -> pd.DataFrame:
-    """Hypothesis variants with count, mean similarity, and weighted divergence.
-
-    `divergence = count * (1 - mean_similarity)`: surfaces variants that are both
+    """Hypothesis variants with count, mean similarity, and weighted figure
+    `count * (1 - mean_similarity)`: surfaces variants that are both
     frequent AND linguistically distant from the reference.
     """
     out = (
@@ -183,7 +182,7 @@ def _hypothesis_table(slice_df: pd.DataFrame) -> pd.DataFrame:
     )
     out["count * (1 - mean_similarity)"] = (out["count"] * (1 - out["mean_similarity"])).round(2)
     out["mean_similarity"] = out["mean_similarity"].round(3)
-    return out.sort_values("count", ascending=False)
+    return out.sort_values("count * (1 - mean_similarity)", ascending=False)
 
 
 def _render_word_charts(word_rows: pd.DataFrame) -> None:
@@ -240,14 +239,14 @@ def _render_word_charts(word_rows: pd.DataFrame) -> None:
         .encode(
             x=alt.X("dialect_region:N", sort=region_order, title=None,
                     axis=alt.Axis(labelAngle=0, labelOverlap=False)),
-            y=alt.Y("delta:Q", title="Mean DAT − Mean DIT similarity"),
+            y=alt.Y("delta:Q", title="Delta (DAT sim − DIT sim)"),
             color=alt.condition(alt.datum.delta >= 0, alt.value(DIT_COLOR), alt.value(DAT_COLOR)),
             tooltip=[
                 alt.Tooltip("dialect_region:N", title="Region"),
-                alt.Tooltip("delta:Q", format=".3f", title="Delta"),
+                alt.Tooltip("delta:Q", format=".3f", title="Delta (DAT sim − DIT sim)"),
             ],
         )
-        .properties(height=280, title="Similarity delta per region (positive = DIT diverges more)")
+        .properties(height=280, title="Similarity delta per region (positive = DAT outperforms DIT)")
     )
     zero = alt.Chart(pd.DataFrame({"y": [0]})).mark_rule(strokeWidth=0.6, color="black").encode(y="y:Q")
 
@@ -353,7 +352,8 @@ def _render_detail(df_view: pd.DataFrame, word: str) -> None:
             )
             .reindex(columns=["dialect-aware", "dialect-ignorant"])
         )
-        delta["delta (DAT − DIT)"] = delta["dialect-aware"] - delta["dialect-ignorant"]
+        delta["delta (DAT sim − DIT sim)"] = delta["dialect-aware"] - delta["dialect-ignorant"]
+        delta = delta.sort_values("delta (DAT sim − DIT sim)", ascending=False)
         st.markdown("**Mean similarity per region**")
         st.dataframe(
             delta.round(3).reset_index(),

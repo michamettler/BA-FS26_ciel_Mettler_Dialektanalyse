@@ -45,7 +45,7 @@ def per_sentence_cost() -> pd.DataFrame:
 
 @st.cache_data
 def regional_summary(include_praet: bool) -> pd.DataFrame:
-    """Per-region mean cost (DAT, DIT), DIT−DAT delta, n. Sorted by delta desc."""
+    """Per-region mean cost (DAT, DIT), DAT−DIT similarity delta, n. Sorted by delta desc."""
     df = per_sentence_cost()
     if not include_praet:
         df = df[~df["is_praeteritum"].fillna(False).astype(bool)]
@@ -63,11 +63,11 @@ def regional_summary(include_praet: bool) -> pd.DataFrame:
     out = pd.DataFrame({
         "DAT cost": pivoted[("mean_cost", "dialect-aware")],
         "DIT cost": pivoted[("mean_cost", "dialect-ignorant")],
-        "delta (DIT − DAT)": pivoted[("mean_cost", "dialect-ignorant")] - pivoted[("mean_cost", "dialect-aware")],
+        "delta (DAT sim − DIT sim)": pivoted[("mean_cost", "dialect-ignorant")] - pivoted[("mean_cost", "dialect-aware")],
         "n sentences": pivoted[("n_sentences", "dialect-aware")].astype(int),
     })
     # Default ordering: dialect signal strongest first.
-    return out.sort_values("delta (DIT − DAT)", ascending=False).reset_index()
+    return out.sort_values("delta (DAT sim − DIT sim)", ascending=False).reset_index()
 
 
 # --- Page ---
@@ -78,7 +78,7 @@ st.markdown(
     "Aggregate dialect distance per region, measured as mean per-sentence alignment cost "
     f"(substitution: 1 − sim; ε rows: λ = {LAMBDA}) divided by reference word count. "
     "Computed on the **train_balanced** subset (~25k sentences per region; subset of train_all). "
-    "Lower cost = closer to Standard German; higher DIT − DAT delta = stronger dialect signal. "
+    "Lower cost = closer to Standard German; higher delta (DAT sim − DIT sim) = stronger dialect signal. "
     "Regions sorted by delta (descending)."
 )
 
@@ -141,19 +141,19 @@ delta_chart = (
     .encode(
         x=alt.X("dialect_region:N", sort=regions_sorted, title=None,
                 axis=alt.Axis(labelAngle=0, labelOverlap=False)),
-        y=alt.Y("delta (DIT − DAT):Q", title="DIT − DAT"),
+        y=alt.Y("delta (DAT sim − DIT sim):Q", title="Delta (DAT sim − DIT sim)"),
         color=alt.condition(
-            alt.datum["delta (DIT − DAT)"] >= 0,
+            alt.datum["delta (DAT sim − DIT sim)"] >= 0,
             alt.value(DIT_COLOR),
             alt.value(DAT_COLOR),
         ),
         tooltip=[
             alt.Tooltip("dialect_region:N", title="Region"),
-            alt.Tooltip("delta (DIT − DAT):Q", format=".4f", title="Delta"),
+            alt.Tooltip("delta (DAT sim − DIT sim):Q", format=".4f", title="Delta"),
             alt.Tooltip("n sentences:Q", title="N sentences"),
         ],
     )
-    .properties(height=220, title="Dialect-specific distance per region (positive = DIT pays more)")
+    .properties(height=220, title="Dialect-specific distance per region (positive = DAT outperforms DIT)")
 )
 zero = alt.Chart(pd.DataFrame({"y": [0]})).mark_rule(strokeWidth=0.6, color="black").encode(y="y:Q")
 
@@ -162,7 +162,7 @@ st.altair_chart(alt.vconcat(paired_chart, delta_chart + zero), use_container_wid
 # --- Table ---
 st.markdown("### Per-region summary")
 display_table = summary.copy()
-for col in ("DAT cost", "DIT cost", "delta (DIT − DAT)"):
+for col in ("DAT cost", "DIT cost", "delta (DAT sim − DIT sim)"):
     display_table[col] = display_table[col].round(4)
 st.dataframe(display_table, hide_index=True, use_container_width=True)
 
