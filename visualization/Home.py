@@ -18,7 +18,7 @@ Standard German reference:
 - **DIT: Dialect-Ignorant** (Whisper-large-v2): a general-purpose ASR; produces phonetic
   Standard German attempts when it hears dialect.
 
-The gap between the two: *what DIT got wrong but DAT got right*: surfaces
+The gap between the two—*what DIT got wrong but DAT got right*—surfaces
 dialect-specific transformations.
 
 ### Pages
