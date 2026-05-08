@@ -1,7 +1,10 @@
 import networkx as nx
 
-from word_similarity_calculator import WordSimilarityCalculator, cost_for_word_pair_by_similarity, \
-    scale_cost_for_networkx
+from word_similarity_calculator import (
+    WordSimilarityCalculator,
+    cost_for_word_pair_by_similarity,
+    scale_cost_for_networkx,
+)
 from preprocessing import clean_word
 
 EPS = "ε"  # epsilon symbol, used for unmatched padding nodes
