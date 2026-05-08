@@ -82,8 +82,8 @@ st.markdown(
     "Regions sorted by delta (descending)."
 )
 
-include_praet = st.sidebar.toggle("Include preterite sentences", value=False,
-                                  help="Off by default: preterite avoidance is a Swiss-German-wide "
+include_praet = st.sidebar.toggle("Include Preterite sentences", value=False,
+                                  help="Off by default: Preterite avoidance is a Swiss-German-wide "
                                        "feature, so it lifts every region's delta similarly and "
                                        "confounds the regional ranking. Toggle on for a 'total dialect "
                                        "distance' view.")

@@ -21,10 +21,13 @@ def clean_word(text: str) -> str:
     text = text.replace("millimeter", "mm")
     text = text.replace("kilometer", "km")
     text = text.replace("kilogramm", "kg")
+    text = text.replace("quadratmeter", "m2")
+    text = text.replace("kubikmeter", "m")
     text = text.replace("milligramm", "mg")
     text = text.replace("milliliter", "ml")
     text = text.replace("millionen", "mio")
     text = text.replace("milliarden", "mrd")
+    text = text.replace("beziehungsweise", "bzw")
     text = text.replace("franken", "fr")
 
     text = alpha2digit(text, "de")

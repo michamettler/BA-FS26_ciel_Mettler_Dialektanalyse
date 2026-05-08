@@ -60,8 +60,8 @@ selected_regions = st.sidebar.multiselect("Regions", REGIONS, default=REGIONS)
 min_count = st.sidebar.slider("Word cloud: minimum occurrences", 1, 50, 5,
                               help="Sample-size guard for the aggregate delta ranking. "
                                    "Does not filter the search box or detail views.")
-include_praet = st.sidebar.toggle("Include preterite sentences", value=True,
-                                  help="preterite forms are themselves dialect-distinctive "
+include_praet = st.sidebar.toggle("Include Preterite sentences", value=True,
+                                  help="Preterite forms are themselves dialect-distinctive "
                                        "(Swiss German rarely uses them): keep them on by default.")
 
 if not selected_regions:
@@ -181,7 +181,7 @@ def _hypothesis_table(slice_df: pd.DataFrame) -> pd.DataFrame:
         .agg(count=("path", "size"), mean_similarity=("similarity", "mean"))
         .reset_index()
     )
-    out["count * (1 - similarity)"] = (out["count"] * (1 - out["mean_similarity"])).round(2)
+    out["count * (1 - mean_similarity)"] = (out["count"] * (1 - out["mean_similarity"])).round(2)
     out["mean_similarity"] = out["mean_similarity"].round(3)
     return out.sort_values("count", ascending=False)
 
