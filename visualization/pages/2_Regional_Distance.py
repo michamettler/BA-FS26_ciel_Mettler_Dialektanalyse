@@ -15,7 +15,7 @@ import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from _data import (  # noqa: E402
-    DAT_COLOR, DIT_COLOR, LAMBDA, REGIONS,
+    DAT_COLOR, DIT_COLOR, LAMBDA,
     cost_for_word_pair_by_similarity,
     load_alignments, load_balanced_paths,
 )
