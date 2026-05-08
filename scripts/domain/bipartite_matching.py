@@ -17,7 +17,7 @@ HYPOTHESIS_PARTITION = "hyp"
 ATTR_WORD = "word"
 ATTR_PARTITION = "partition"
 ATTR_SIMILARITY = "similarity"  # float for word-word edges, None for epsilon routing edges
-ATTR_WEIGHT = "weight"  # int network-flow cost: round((1 − similarity) * _COST_SCALE) for substitutions or epsilon
+ATTR_WEIGHT = "weight"  # int network-flow cost: scaled from (1 − similarity) for substitutions or epsilon
 
 
 def build_full_bipartite_graph(
