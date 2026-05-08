@@ -74,7 +74,7 @@ with st.spinner("Loading alignment data…"):
 if not include_praet:
     df = df[~df["is_praeteritum"].fillna(False).astype(bool)]
 
-st.sidebar.metric("Rows in view", f"{len(df):,}")
+st.sidebar.metric("Alignments in view", f"{len(df):,}")
 st.sidebar.metric("Unique sentences", f"{df['path'].nunique():,}")
 
 # Reference-word frequencies (substitution + deletion edges only: drop insertions where ref_word is NA)

@@ -97,7 +97,7 @@ with st.spinner("Computing per-sentence alignment costs…"):
 # Sidebar at-a-glance counts (alignment rows behind the per-sentence aggregates + sentence count).
 align_in_view = load_alignments()
 align_in_view = align_in_view[align_in_view["path"].isin(set(per_sentence["path"]))]
-st.sidebar.metric("Rows in view", f"{len(align_in_view):,}")
+st.sidebar.metric("Alignments in view", f"{len(align_in_view):,}")
 st.sidebar.metric("Unique sentences", f"{per_sentence['path'].nunique():,}")
 
 regions_sorted = summary["dialect_region"].tolist()
