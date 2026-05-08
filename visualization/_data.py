@@ -19,7 +19,7 @@ BALANCED_TSV = PROJECT_ROOT / "datasets" / "STT4SG-350 v2.1" / "train_balanced.t
 
 REGIONS = ["Wallis", "Zürich", "Bern", "Basel", "Graubünden", "Innerschweiz", "Ostschweiz"]
 
-# Calibrated epsilon penalty — must match build_alignment_table.LAMBDA_.
+# Calibrated epsilon penalty: must match build_alignment_table.LAMBDA_.
 LAMBDA = 0.45
 
 DAT_COLOR = "#4c72b0"

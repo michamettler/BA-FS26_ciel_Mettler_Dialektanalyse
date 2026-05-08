@@ -1,7 +1,7 @@
 """
-Dialect Word Lexicon — Page 1.
+Dialect Word Lexicon: Page 1.
 
-Search a Hochdeutsch reference word, see how DIT (dialect-ignorant Whisper) and
+Search a Standard German reference word, see how DIT (dialect-ignorant Whisper) and
 DAT (dialect-aware FHNW STT4SG) transcribed it across regions. Click-through
 from a word cloud or autocomplete search.
 
@@ -26,7 +26,7 @@ from plot_helpers import plot_reduced_bipartite_graph_with_matching  # noqa: E40
 from preprocessing import clean_word  # noqa: E402
 from word_similarity_calculator import WordSimilarityCalculator  # noqa: E402
 
-# Calibrated hyperparameters — must match build_alignment_table.py.
+# Calibrated hyperparameters: must match build_alignment_table.py.
 _ALPHA = 0.85
 _LAMBDA = 0.45
 _USE_GLOBAL_LEX_NORM = False
@@ -51,18 +51,18 @@ def _reduced_graph_figure(reference: str, hypothesis: str):
     matching = solve_matching(G)
     return plot_reduced_bipartite_graph_with_matching(G, matching)
 
-# ── Page ──────────────────────────────────────────────────────────────────────
+# --- Page ---
 st.set_page_config(page_title="Dialect Word Lexicon", layout="wide")
 st.title("Dialect Word Lexicon")
 
 # Sidebar filters
 selected_regions = st.sidebar.multiselect("Regions", REGIONS, default=REGIONS)
-min_count = st.sidebar.slider("Word cloud — minimum occurrences", 1, 50, 5,
+min_count = st.sidebar.slider("Word cloud: minimum occurrences", 1, 50, 5,
                               help="Sample-size guard for the aggregate delta ranking. "
                                    "Does not filter the search box or detail views.")
-include_praet = st.sidebar.toggle("Include Präteritum sentences", value=True,
-                                  help="Präteritum forms are themselves dialect-distinctive "
-                                       "(Swiss German rarely uses them) — keep them on by default.")
+include_praet = st.sidebar.toggle("Include Preterite sentences", value=True,
+                                  help="Preterite forms are themselves dialect-distinctive "
+                                       "(Swiss German rarely uses them): keep them on by default.")
 
 if not selected_regions:
     st.info("Select at least one region in the sidebar to begin.")
@@ -74,10 +74,10 @@ with st.spinner("Loading alignment data…"):
 if not include_praet:
     df = df[~df["is_praeteritum"].fillna(False).astype(bool)]
 
-st.sidebar.metric("Rows in view", f"{len(df):,}")
+st.sidebar.metric("Alignments in view", f"{len(df):,}")
 st.sidebar.metric("Unique sentences", f"{df['path'].nunique():,}")
 
-# Reference-word frequencies (substitution + deletion edges only — drop insertions where ref_word is NA)
+# Reference-word frequencies (substitution + deletion edges only: drop insertions where ref_word is NA)
 ref_counts = (
     df[df["reference_word"].notna()]
     .groupby("reference_word")
@@ -91,7 +91,7 @@ selected_word = st.selectbox(
     f"Search a reference word ({len(ref_counts):,} unique)",
     options=search_options,
     key="selected_word",
-    placeholder="Start typing a Hochdeutsch word…",
+    placeholder="Start typing a Standard German word…",
 )
 
 
@@ -101,12 +101,12 @@ def _back_to_cloud():
 
 
 def _render_overview(df: pd.DataFrame, min_count_threshold: int) -> None:
-    """Word cloud of best dialect-candidate ref words: highest mean DAT − DIT similarity delta."""
+    """Word cloud of best dialect-candidate ref words: highest mean delta (DAT sim − DIT sim)."""
     st.markdown("### Dialect-distinctive vocabulary")
     st.caption(
         "Reference words ranked by **mean DAT sim − mean DIT sim** (similarity delta) "
         "across the selected regions, restricted to words above the minimum-occurrences "
-        "threshold (sidebar). Larger = DIT struggles more than DAT on this word — "
+        "threshold (sidebar). Larger = DIT struggles more than DAT on this word: "
         "the strongest dialect-candidate signal. "
         "Click an entry in the autocomplete above to drill into a word."
     )
@@ -162,29 +162,27 @@ def _render_overview(df: pd.DataFrame, min_count_threshold: int) -> None:
     with st.expander("Top dialect-candidate words"):
         display = pd.DataFrame({
             "word": top.index,
-            "delta": top.round(3).values,
             "count": [int(counts[w]) for w in top.index],
             "DAT sim": [round(sim.loc[w, "dialect-aware"], 3) for w in top.index],
             "DIT sim": [round(sim.loc[w, "dialect-ignorant"], 3) for w in top.index],
+            "delta (DAT sim − DIT sim)": top.round(3).values,
         })
         st.dataframe(display, use_container_width=True, hide_index=True)
 
 
 def _hypothesis_table(slice_df: pd.DataFrame) -> pd.DataFrame:
-    """Hypothesis variants with count, mean similarity, and weighted divergence.
-
-    `divergence = count * (1 - mean_similarity)` — surfaces variants that are both
-    frequent AND linguistically distant from the reference. Click a column header
-    in the rendered table to sort.
+    """Hypothesis variants with count, mean similarity, and weighted figure
+    `count * (1 - mean_similarity)`: surfaces variants that are both
+    frequent AND linguistically distant from the reference.
     """
     out = (
         slice_df.groupby("hypothesis_word", dropna=False)
         .agg(count=("path", "size"), mean_similarity=("similarity", "mean"))
         .reset_index()
     )
-    out["divergence"] = (out["count"] * (1 - out["mean_similarity"])).round(2)
+    out["count * (1 - mean_similarity)"] = (out["count"] * (1 - out["mean_similarity"])).round(2)
     out["mean_similarity"] = out["mean_similarity"].round(3)
-    return out.sort_values("count", ascending=False)
+    return out.sort_values("count * (1 - mean_similarity)", ascending=False)
 
 
 def _render_word_charts(word_rows: pd.DataFrame) -> None:
@@ -193,7 +191,7 @@ def _render_word_charts(word_rows: pd.DataFrame) -> None:
     if not region_order:
         return
 
-    # ── Regional DIT-variant breakdown (stacked bar) ──────────────────────────
+    # regional DIT-variant word breakdown (stacked bar)
     dit = word_rows[word_rows["model"] == "dialect-ignorant"].copy()
     dit["variant"] = dit["hypothesis_word"].fillna("(deletion)")
 
@@ -226,7 +224,7 @@ def _render_word_charts(word_rows: pd.DataFrame) -> None:
         .properties(height=340, title="DIT variants per region")
     )
 
-    # ── Per-region similarity delta bar (kept) ────────────────────────────────
+    # per-region similarity delta bar
     real = word_rows[word_rows["hypothesis_word"].notna()]
     delta_data = (
         real.pivot_table(index="dialect_region", columns="model", values="similarity", aggfunc="mean")
@@ -241,14 +239,14 @@ def _render_word_charts(word_rows: pd.DataFrame) -> None:
         .encode(
             x=alt.X("dialect_region:N", sort=region_order, title=None,
                     axis=alt.Axis(labelAngle=0, labelOverlap=False)),
-            y=alt.Y("delta:Q", title="Mean DAT − Mean DIT similarity"),
+            y=alt.Y("delta:Q", title="Delta (DAT sim − DIT sim)"),
             color=alt.condition(alt.datum.delta >= 0, alt.value(DIT_COLOR), alt.value(DAT_COLOR)),
             tooltip=[
                 alt.Tooltip("dialect_region:N", title="Region"),
-                alt.Tooltip("delta:Q", format=".3f", title="Delta"),
+                alt.Tooltip("delta:Q", format=".3f", title="Delta (DAT sim − DIT sim)"),
             ],
         )
-        .properties(height=280, title="Similarity delta per region (positive = DIT diverges more)")
+        .properties(height=280, title="Similarity delta per region (positive = DAT outperforms DIT)")
     )
     zero = alt.Chart(pd.DataFrame({"y": [0]})).mark_rule(strokeWidth=0.6, color="black").encode(y="y:Q")
 
@@ -256,7 +254,7 @@ def _render_word_charts(word_rows: pd.DataFrame) -> None:
     st.altair_chart(delta_bar + zero, use_container_width=True)
 
 
-# ── Alignment visualization helpers ──────────────────────────────────────────
+# --- Alignment visualization helpers ---
 def _alignment_columns(rows: pd.DataFrame) -> list[dict]:
     """Convert per-(path, model) alignment rows into ordered display columns.
 
@@ -306,7 +304,6 @@ def _render_alignment_html(columns: list[dict], hyp_label: str, searched_word: s
     hyp_cells = [f'<td style="{_LABEL_STYLE}">{html.escape(hyp_label)}</td>']
     for col in columns:
         is_searched = searched_word is not None and col["ref"] == searched_word
-        # Translucent amber: readable on both light and dark Streamlit themes.
         bg = " background-color: rgba(247, 181, 0, 0.4);" if is_searched else ""
         base = f"padding: 4px 10px;{bg} border-bottom: 1px solid #eee;"
         ref_style = base + (" color: #999; font-style: italic;" if col["kind"] == "insertion" else "")
@@ -355,7 +352,8 @@ def _render_detail(df_view: pd.DataFrame, word: str) -> None:
             )
             .reindex(columns=["dialect-aware", "dialect-ignorant"])
         )
-        delta["delta (DAT − DIT)"] = delta["dialect-aware"] - delta["dialect-ignorant"]
+        delta["delta (DAT sim − DIT sim)"] = delta["dialect-aware"] - delta["dialect-ignorant"]
+        delta = delta.sort_values("delta (DAT sim − DIT sim)", ascending=False)
         st.markdown("**Mean similarity per region**")
         st.dataframe(
             delta.round(3).reset_index(),
@@ -367,7 +365,7 @@ def _render_detail(df_view: pd.DataFrame, word: str) -> None:
             "→ stronger candidate for a region-specific dialect transformation."
         )
 
-    # Example sentences with word-level alignment, grouped by region, collapsed by default.
+    # sentences with word-level alignment, grouped by region, collapsed by default.
     unique_paths = (
         word_rows.drop_duplicates("path")[
             ["path", "dialect_region", "gender", "age",
@@ -380,7 +378,7 @@ def _render_detail(df_view: pd.DataFrame, word: str) -> None:
         .reset_index(drop=True)
     )
 
-    st.markdown(f"**Example sentences with word-level alignment** — {len(unique_paths):,} sentences")
+    st.markdown(f"**Example sentences with word-level alignment**: {len(unique_paths):,} sentences")
 
     rows_by_path = dict(tuple(
         df_view[df_view["path"].isin(set(unique_paths["path"]))]
@@ -424,14 +422,14 @@ def _render_detail(df_view: pd.DataFrame, word: str) -> None:
                 st.markdown(_render_alignment_html(dit_cols, "Hypothesis DIT", searched_word=word), unsafe_allow_html=True)
                 st.markdown(_render_alignment_html(dat_cols, "Hypothesis DAT", searched_word=word), unsafe_allow_html=True)
 
-                if st.checkbox("Show technical graph alignment", key=f"graph_{path}"):
+                if st.checkbox("Show technical alignment", key=f"graph_{path}"):
                     fig_dit = _reduced_graph_figure(row["reference"], row["dit_hypothesis"])
                     if fig_dit is not None:
-                        st.markdown("**DIT — reduced bipartite matching**")
+                        st.markdown("**DIT: reduced bipartite matching**")
                         st.pyplot(fig_dit)
                     fig_dat = _reduced_graph_figure(row["reference"], row["dat_hypothesis"])
                     if fig_dat is not None:
-                        st.markdown("**DAT — reduced bipartite matching**")
+                        st.markdown("**DAT: reduced bipartite matching**")
                         st.pyplot(fig_dat)
 
 

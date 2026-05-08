@@ -1,5 +1,5 @@
 """
-Regional Distance from Hochdeutsch — Page 2.
+Regional Distance from Standard German: Page 2.
 
 Aggregate dialect distance per region, computed as mean per-sentence alignment
 cost (substitution rows: 1 − sim; epsilon rows: λ = 0.45) divided by reference
@@ -45,7 +45,7 @@ def per_sentence_cost() -> pd.DataFrame:
 
 @st.cache_data
 def regional_summary(include_praet: bool) -> pd.DataFrame:
-    """Per-region mean cost (DAT, DIT), DIT−DAT delta, n. Sorted by delta desc."""
+    """Per-region mean cost (DAT, DIT), DIT−DAT cost delta, n. Sorted by delta desc."""
     df = per_sentence_cost()
     if not include_praet:
         df = df[~df["is_praeteritum"].fillna(False).astype(bool)]
@@ -63,27 +63,27 @@ def regional_summary(include_praet: bool) -> pd.DataFrame:
     out = pd.DataFrame({
         "DAT cost": pivoted[("mean_cost", "dialect-aware")],
         "DIT cost": pivoted[("mean_cost", "dialect-ignorant")],
-        "delta (DIT − DAT)": pivoted[("mean_cost", "dialect-ignorant")] - pivoted[("mean_cost", "dialect-aware")],
+        "delta (DIT cost − DAT cost)": pivoted[("mean_cost", "dialect-ignorant")] - pivoted[("mean_cost", "dialect-aware")],
         "n sentences": pivoted[("n_sentences", "dialect-aware")].astype(int),
     })
     # Default ordering: dialect signal strongest first.
-    return out.sort_values("delta (DIT − DAT)", ascending=False).reset_index()
+    return out.sort_values("delta (DIT cost − DAT cost)", ascending=False).reset_index()
 
 
-# ── Page ──────────────────────────────────────────────────────────────────────
+# --- Page ---
 st.set_page_config(page_title="Regional Distance", layout="wide")
-st.title("Regional Distance from Hochdeutsch")
+st.title("Regional Distance from Standard German")
 
 st.markdown(
     "Aggregate dialect distance per region, measured as mean per-sentence alignment cost "
     f"(substitution: 1 − sim; ε rows: λ = {LAMBDA}) divided by reference word count. "
     "Computed on the **train_balanced** subset (~25k sentences per region; subset of train_all). "
-    "Lower cost = closer to Hochdeutsch; higher DIT − DAT delta = stronger dialect signal. "
+    "Lower cost = closer to Standard German; higher delta (DIT cost − DAT cost) = stronger dialect signal. "
     "Regions sorted by delta (descending)."
 )
 
-include_praet = st.sidebar.toggle("Include Präteritum sentences", value=False,
-                                  help="Off by default: Präteritum avoidance is a Swiss-German-wide "
+include_praet = st.sidebar.toggle("Include Preterite sentences", value=False,
+                                  help="Off by default: Preterite avoidance is a Swiss-German-wide "
                                        "feature, so it lifts every region's delta similarly and "
                                        "confounds the regional ranking. Toggle on for a 'total dialect "
                                        "distance' view.")
@@ -97,7 +97,7 @@ with st.spinner("Computing per-sentence alignment costs…"):
 # Sidebar at-a-glance counts (alignment rows behind the per-sentence aggregates + sentence count).
 align_in_view = load_alignments()
 align_in_view = align_in_view[align_in_view["path"].isin(set(per_sentence["path"]))]
-st.sidebar.metric("Rows in view", f"{len(align_in_view):,}")
+st.sidebar.metric("Alignments in view", f"{len(align_in_view):,}")
 st.sidebar.metric("Unique sentences", f"{per_sentence['path'].nunique():,}")
 
 regions_sorted = summary["dialect_region"].tolist()
@@ -106,7 +106,7 @@ model_scale = alt.Scale(
     range=[DAT_COLOR, DIT_COLOR],
 )
 
-# ── Headline plots: paired bars + delta bar (Altair, vertically stacked) ────
+# --- Headline plots: paired bars + delta bar (Altair, vertically stacked) ---
 long_summary = summary.melt(
     id_vars=["dialect_region"],
     value_vars=["DAT cost", "DIT cost"],
@@ -141,32 +141,32 @@ delta_chart = (
     .encode(
         x=alt.X("dialect_region:N", sort=regions_sorted, title=None,
                 axis=alt.Axis(labelAngle=0, labelOverlap=False)),
-        y=alt.Y("delta (DIT − DAT):Q", title="DIT − DAT"),
+        y=alt.Y("delta (DIT cost − DAT cost):Q", title="Delta (DIT cost − DAT cost)"),
         color=alt.condition(
-            alt.datum["delta (DIT − DAT)"] >= 0,
+            alt.datum["delta (DIT cost − DAT cost)"] >= 0,
             alt.value(DIT_COLOR),
             alt.value(DAT_COLOR),
         ),
         tooltip=[
             alt.Tooltip("dialect_region:N", title="Region"),
-            alt.Tooltip("delta (DIT − DAT):Q", format=".4f", title="Delta"),
+            alt.Tooltip("delta (DIT cost − DAT cost):Q", format=".4f", title="Delta"),
             alt.Tooltip("n sentences:Q", title="N sentences"),
         ],
     )
-    .properties(height=220, title="Dialect-specific distance per region (positive = DIT pays more)")
+    .properties(height=220, title="Dialect-specific distance per region (positive = DAT outperforms DIT)")
 )
 zero = alt.Chart(pd.DataFrame({"y": [0]})).mark_rule(strokeWidth=0.6, color="black").encode(y="y:Q")
 
 st.altair_chart(alt.vconcat(paired_chart, delta_chart + zero), use_container_width=True)
 
-# ── Table ────────────────────────────────────────────────────────────────────
+# --- Table ---
 st.markdown("### Per-region summary")
 display_table = summary.copy()
-for col in ("DAT cost", "DIT cost", "delta (DIT − DAT)"):
+for col in ("DAT cost", "DIT cost", "delta (DIT cost − DAT cost)"):
     display_table[col] = display_table[col].round(4)
 st.dataframe(display_table, hide_index=True, use_container_width=True)
 
-# ── Distribution ─────────────────────────────────────────────────────────────
+# --- Distribution ---
 st.markdown("### Per-sentence cost distribution")
 st.caption(
     "Each box: within-region distribution of per-sentence alignment cost. "
@@ -174,8 +174,7 @@ st.caption(
     "Wide IQR = mixed dialect compliance across speakers."
 )
 
-# Aggregate to box stats server-side (avoids Vega-Lite max_rows on 343k rows
-# and the xOffset/compound-mark friction with mark_boxplot).
+# Aggregate to box stats server-side
 def _box_stats(df: pd.DataFrame) -> pd.DataFrame:
     out = []
     for (region, model), grp in df.groupby(["dialect_region", "model"], observed=True):
