@@ -1,5 +1,5 @@
 """
-Regional Distance from Hochdeutsch — Page 2.
+Regional Distance from Standard German: Page 2.
 
 Aggregate dialect distance per region, computed as mean per-sentence alignment
 cost (substitution rows: 1 − sim; epsilon rows: λ = 0.45) divided by reference
@@ -70,20 +70,20 @@ def regional_summary(include_praet: bool) -> pd.DataFrame:
     return out.sort_values("delta (DIT − DAT)", ascending=False).reset_index()
 
 
-# ── Page ──────────────────────────────────────────────────────────────────────
+# --- Page ---
 st.set_page_config(page_title="Regional Distance", layout="wide")
-st.title("Regional Distance from Hochdeutsch")
+st.title("Regional Distance from Standard German")
 
 st.markdown(
     "Aggregate dialect distance per region, measured as mean per-sentence alignment cost "
     f"(substitution: 1 − sim; ε rows: λ = {LAMBDA}) divided by reference word count. "
     "Computed on the **train_balanced** subset (~25k sentences per region; subset of train_all). "
-    "Lower cost = closer to Hochdeutsch; higher DIT − DAT delta = stronger dialect signal. "
+    "Lower cost = closer to Standard German; higher DIT − DAT delta = stronger dialect signal. "
     "Regions sorted by delta (descending)."
 )
 
-include_praet = st.sidebar.toggle("Include Präteritum sentences", value=False,
-                                  help="Off by default: Präteritum avoidance is a Swiss-German-wide "
+include_praet = st.sidebar.toggle("Include preterite sentences", value=False,
+                                  help="Off by default: preterite avoidance is a Swiss-German-wide "
                                        "feature, so it lifts every region's delta similarly and "
                                        "confounds the regional ranking. Toggle on for a 'total dialect "
                                        "distance' view.")
@@ -106,7 +106,7 @@ model_scale = alt.Scale(
     range=[DAT_COLOR, DIT_COLOR],
 )
 
-# ── Headline plots: paired bars + delta bar (Altair, vertically stacked) ────
+# --- Headline plots: paired bars + delta bar (Altair, vertically stacked) ---
 long_summary = summary.melt(
     id_vars=["dialect_region"],
     value_vars=["DAT cost", "DIT cost"],
@@ -159,14 +159,14 @@ zero = alt.Chart(pd.DataFrame({"y": [0]})).mark_rule(strokeWidth=0.6, color="bla
 
 st.altair_chart(alt.vconcat(paired_chart, delta_chart + zero), use_container_width=True)
 
-# ── Table ────────────────────────────────────────────────────────────────────
+# --- Table ---
 st.markdown("### Per-region summary")
 display_table = summary.copy()
 for col in ("DAT cost", "DIT cost", "delta (DIT − DAT)"):
     display_table[col] = display_table[col].round(4)
 st.dataframe(display_table, hide_index=True, use_container_width=True)
 
-# ── Distribution ─────────────────────────────────────────────────────────────
+# --- Distribution ---
 st.markdown("### Per-sentence cost distribution")
 st.caption(
     "Each box: within-region distribution of per-sentence alignment cost. "
@@ -174,8 +174,7 @@ st.caption(
     "Wide IQR = mixed dialect compliance across speakers."
 )
 
-# Aggregate to box stats server-side (avoids Vega-Lite max_rows on 343k rows
-# and the xOffset/compound-mark friction with mark_boxplot).
+# Aggregate to box stats server-side
 def _box_stats(df: pd.DataFrame) -> pd.DataFrame:
     out = []
     for (region, model), grp in df.groupby(["dialect_region", "model"], observed=True):
