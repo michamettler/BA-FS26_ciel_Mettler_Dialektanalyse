@@ -22,7 +22,7 @@ def clean_word(text: str) -> str:
     text = text.replace("kilometer", "km")
     text = text.replace("kilogramm", "kg")
     text = text.replace("quadratmeter", "m2")
-    text = text.replace("kubikmeter", "m")
+    text = text.replace("kubikmeter", "m3")
     text = text.replace("milligramm", "mg")
     text = text.replace("milliliter", "ml")
     text = text.replace("millionen", "mio")
