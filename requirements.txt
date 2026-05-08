@@ -15,3 +15,4 @@ seaborn
 rich
 streamlit
 streamlit-echarts
+text2num
