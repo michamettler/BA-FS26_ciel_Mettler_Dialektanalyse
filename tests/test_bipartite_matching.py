@@ -86,12 +86,12 @@ class TestEdgeAttributes(unittest.TestCase):
         self.assertAlmostEqual(edge["similarity"], 1.0)
 
     def test_word_word_edge_records_partial_similarity(self):
-        # Levenshtein.ratio("haus","huus") = 0.75; cost = (1 - 0.75) * 1000 = 250
+        # dist=2, lensum=8, => lexical similarity = (8−2) / 8 = 0.75
         calc = WordSimilarityCalculator(sent_len=2, alpha=1.0)
-        G = build_full_bipartite_graph(["haus"], ["huus"], calc)
+        G = build_full_bipartite_graph(["haus"], ["maus"], calc)
         edge = G[ref(0)][hyp(0)]
         self.assertAlmostEqual(edge["similarity"], 0.75)
-        self.assertEqual(edge["weight"], 250)
+        self.assertEqual(edge["weight"], 250) # round((1 − 0.75) * _COST_SCALE)
 
     def test_epsilon_edges_carry_lambda_cost_and_no_similarity(self):
         calc = WordSimilarityCalculator(sent_len=2, lambda_=0.4)
