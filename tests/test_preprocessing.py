@@ -69,6 +69,18 @@ class TestCleanWordAbbreviations(unittest.TestCase):
         self.assertIn("prozent", clean_word("60%").split())
         self.assertIn("prozent", clean_word("60 Prozent").split())
 
+    def test_quadratmeter_and_m2_share_token(self):
+        self.assertIn("m2", clean_word("50 Quadratmeter Wohnfläche").split())
+        self.assertIn("m2", clean_word("50 m2 Wohnfläche").split())
+
+    def test_kubikmeter_and_m3_share_token(self):
+        self.assertIn("m3", clean_word("10 Kubikmeter Wasser").split())
+        self.assertIn("m3", clean_word("10 m3 Wasser").split())
+
+    def test_beziehungsweise_and_bzw_share_token(self):
+        self.assertIn("bzw", clean_word("Hund beziehungsweise Katze").split())
+        self.assertIn("bzw", clean_word("Hund bzw. Katze").split())
+
 
 class TestCleanWordDigits(unittest.TestCase):
     """Digits stay in the output (text2num normalises spelled-out forms to

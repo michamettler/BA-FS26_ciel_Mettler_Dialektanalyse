@@ -141,15 +141,15 @@ delta_chart = (
     .encode(
         x=alt.X("dialect_region:N", sort=regions_sorted, title=None,
                 axis=alt.Axis(labelAngle=0, labelOverlap=False)),
-        y=alt.Y("delta (DAT sim − DIT sim):Q", title="Delta (DAT sim − DIT sim)"),
+        y=alt.Y("delta (DAT cost − DIT cost):Q", title="Delta (DAT cost − DIT cost)"),
         color=alt.condition(
-            alt.datum["delta (DAT sim − DIT sim)"] >= 0,
+            alt.datum["delta (DAT cost − DIT cost)"] >= 0,
             alt.value(DIT_COLOR),
             alt.value(DAT_COLOR),
         ),
         tooltip=[
             alt.Tooltip("dialect_region:N", title="Region"),
-            alt.Tooltip("delta (DAT sim − DIT sim):Q", format=".4f", title="Delta"),
+            alt.Tooltip("delta (DAT cost − DIT cost):Q", format=".4f", title="Delta"),
             alt.Tooltip("n sentences:Q", title="N sentences"),
         ],
     )
