@@ -118,6 +118,5 @@ class WordSimilarityCalculator:
             return linear_similarity ** 2 if self.use_squared_positional else linear_similarity
         return 1.0
 
-    def cost_for_epsilon_by_penalty(self) -> int:
-        """Convert an epsilon penalty to an integer cost for the network flow algorithm."""
-        return scale_cost_for_networkx(self.lambda_)
+    def cost_for_epsilon_by_penalty(self) -> float:
+        return self.lambda_

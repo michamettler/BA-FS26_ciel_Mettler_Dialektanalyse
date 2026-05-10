@@ -100,7 +100,9 @@ def build_full_bipartite_graph(
                 similarity=similarity,
             )
     # edges from ref word nodes to hyp epsilon-nodes
-    epsilon_cost = calculator.cost_for_epsilon_by_penalty()
+    epsilon_cost = scale_cost_for_networkx(
+        calculator.cost_for_epsilon_by_penalty()
+    )
     for i in range(n_r):
         for k in range(n_r):
             G.add_edge(

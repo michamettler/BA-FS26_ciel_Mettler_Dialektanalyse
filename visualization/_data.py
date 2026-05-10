@@ -8,7 +8,7 @@ import streamlit as st
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "scripts" / "domain"))
 
-from word_similarity_calculator import cost_for_word_pair_by_similarity  # noqa: E402, F401
+from word_similarity_calculator import WordSimilarityCalculator, cost_for_word_pair_by_similarity  # noqa: E402, F401
 
 ALIGN_DIR = PROJECT_ROOT / "experiments" / "analysis"
 DAT_PARQUET = ALIGN_DIR / "train_all_alignments_dialect-aware.parquet"
@@ -24,6 +24,24 @@ LAMBDA = 0.45
 
 DAT_COLOR = "#4c72b0"
 DIT_COLOR = "#dd8452"
+
+
+def epsilon_cost() -> float:
+    """Cost the bipartite solver charges for routing an unmatched word through an ε edge (= λ).
+
+    Computed lazily so calculator/lambda changes propagate across Streamlit reruns without restart.
+    """
+    return WordSimilarityCalculator(sent_len=1, lambda_=LAMBDA).cost_for_epsilon_by_penalty()
+
+
+def deletion_similarity() -> float:
+    """Similarity equivalent of the bipartite solver's ε-edge cost (1 − λ).
+
+    Use this to impute deletions when computing per-edge similarity means: a deletion contributes
+    the same similarity it would have contributed in cost-domain (`1 − λ`), keeping the analysis
+    consistent with the matcher's ε-edge cost.
+    """
+    return cost_for_word_pair_by_similarity(epsilon_cost())
 
 
 @st.cache_data
@@ -51,16 +69,16 @@ def load_metadata() -> pd.DataFrame:
 
 @st.cache_data
 def joined_view(regions: tuple[str, ...]) -> pd.DataFrame:
-    """Alignments + metadata, filtered to the selected regions."""
-    align = load_alignments()
-    meta = load_metadata()
-    df = align.merge(meta, on="path", how="left")
+    """Alignments & metadata, filtered to the selected regions."""
+    alignments = load_alignments()
+    metadata = load_metadata()
+    df = alignments.merge(metadata, on="path", how="left")
     return df[df["dialect_region"].isin(regions)].reset_index(drop=True)
 
 
 @st.cache_data
 def load_balanced_paths() -> pd.DataFrame:
     """train_balanced.tsv joined with the praeteritum flag (path, region, is_praeteritum)."""
-    balanced = pd.read_csv(BALANCED_TSV, sep="\t", encoding="utf-8-sig")[["path", "dialect_region"]]
-    praet = pd.read_csv(DIT_TSV, sep="\t", encoding="utf-8-sig", usecols=["path", "is_praeteritum"])
-    return balanced.merge(praet, on="path", how="left")
+    balanced_data = pd.read_csv(BALANCED_TSV, sep="\t", encoding="utf-8-sig")[["path", "dialect_region"]]
+    is_praet = pd.read_csv(DIT_TSV, sep="\t", encoding="utf-8-sig", usecols=["path", "is_praeteritum"])
+    return balanced_data.merge(is_praet, on="path", how="left")

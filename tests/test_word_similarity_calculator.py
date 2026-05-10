@@ -225,28 +225,20 @@ class TestWordSimilarityCalculator(unittest.TestCase):
         # network simplex demands ints; a float with .0 wouldn't satisfy strict typing
         self.assertIsInstance(scale_cost_for_networkx(0.5), int)
 
-    # epsilon cost (combines analytical + scaling internally)
+    # epsilon cost (returns un-scaled λ in [0, 1]; scaling for networkx is the caller's job)
 
-    def test_cost_for_epsilon_is_zero_when_lambda_is_zero(self):
-        calc = WordSimilarityCalculator(sent_len=5, lambda_=0.0)
-        self.assertEqual(calc.cost_for_epsilon_by_penalty(), 0)
+    def test_cost_for_epsilon_returns_lambda(self):
+        self.assertAlmostEqual(WordSimilarityCalculator(sent_len=5, lambda_=0.0).cost_for_epsilon_by_penalty(), 0.0)
+        self.assertAlmostEqual(WordSimilarityCalculator(sent_len=5, lambda_=1.0).cost_for_epsilon_by_penalty(), 1.0)
+        self.assertAlmostEqual(WordSimilarityCalculator(sent_len=5, lambda_=0.3).cost_for_epsilon_by_penalty(), 0.3)
+        self.assertAlmostEqual(WordSimilarityCalculator(sent_len=5, lambda_=0.45).cost_for_epsilon_by_penalty(), 0.45)
 
-    def test_cost_for_epsilon_is_max_when_lambda_is_one(self):
-        calc = WordSimilarityCalculator(sent_len=5, lambda_=1.0)
-        self.assertEqual(calc.cost_for_epsilon_by_penalty(), COST_SCALE)
-
-    def test_cost_for_epsilon_scales_linearly_with_lambda(self):
-        # cost = round(lambda * 1000)
-        self.assertEqual(WordSimilarityCalculator(sent_len=5, lambda_=0.3).cost_for_epsilon_by_penalty(), 300)
-        self.assertEqual(WordSimilarityCalculator(sent_len=5, lambda_=0.5).cost_for_epsilon_by_penalty(), 500)
-        self.assertEqual(WordSimilarityCalculator(sent_len=5, lambda_=0.45).cost_for_epsilon_by_penalty(), 450)
-
-    def test_word_pair_and_epsilon_costs_share_consistent_scaling(self):
-        # composing the two converters must match cost_for_epsilon_by_penalty for the same numeric input
+    def test_word_pair_and_epsilon_costs_share_cost_domain(self):
+        # both return un-scaled costs in [0, 1]; cost(sim=0.6) == cost_for_epsilon when λ=0.4
         calc = WordSimilarityCalculator(sent_len=5, lambda_=0.4)
-        self.assertEqual(
+        self.assertAlmostEqual(
             calc.cost_for_epsilon_by_penalty(),
-            scale_cost_for_networkx(cost_for_word_pair_by_similarity(0.6)),
+            cost_for_word_pair_by_similarity(0.6),
         )
 
 

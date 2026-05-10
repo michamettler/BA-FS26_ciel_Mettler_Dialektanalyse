@@ -10,23 +10,21 @@ st.title("Swiss German Dialect Analysis")
 
 st.markdown(
     """
-This tool explores **dialect-distinctive transformations in Swiss German speech** by
-comparing two automatic speech recognition (ASR) systems against the canonical
-Standard German reference:
+This tool explores **dialect-specific words in Swiss German speech** by
+comparing two automatic speech recognition (ASR) systems against the Standard German reference:
 
-- **DAT: Dialect-Aware** (FHNW STT4SG): trained on Swiss German; produces clean Standard German.
-- **DIT: Dialect-Ignorant** (Whisper-large-v2): a general-purpose ASR; produces phonetic
-  Standard German attempts when it hears dialect.
+- **DAT: Dialect-Aware-Transcript** (FHNW STT4SG): trained on Swiss German; produces clean Standard German.
+- **DIT: Dialect-Ignorant-Transcript** (Whisper-large-v2): a general-purpose ASR; produces phonetic
+  Standard German approximations of dialect speech.
 
-The gap between the two—*what DIT got wrong but DAT got right*—surfaces
-dialect-specific transformations.
+The gap between the two — *what DIT got wrong but DAT got right* — indicates whether a variant is
+dialect-specific.
 
 ### Pages
 
-- **Dialect Word Lexicon**: search any Standard German reference word and see how each region's
-  speakers transformed it. Inspect example sentences with word-level alignments.
-- **Regional Distance**: aggregate dialect distance per region. Which dialect is most
-  distant from Standard German?
+- **Dialect Word Lexicon**: search any Standard German reference word and see its dialect variants from both
+  DIT and DAT. Inspect each clip's hypotheses with word-level alignments.
+- **Regional Distance**: which Swiss German dialect is most distant from Standard German?
 
 Use the sidebar to navigate.
 """
