@@ -7,9 +7,10 @@ from text_to_num import alpha2digit
 def clean_word(word: str) -> str:
     """Clean and normalize a single word for comparison.
 
-    Lowercases, normalizes ß, contracts spelled-out unit/currency/magnitude words
-    to their abbreviations (so "Franken" and "Fr." both end up as "fr"), converts
-    spelled-out numerals to digits via text2num, and strips punctuation.
+    Lowercases, normalizes ß, replaces "%" with "prozent", contracts spelled-out
+    unit/currency/magnitude words to their abbreviations (so "Franken" and
+    "Fr." both end up as "fr"), converts spelled-out numerals to digits via
+    text2num, and strips punctuation.
     """
     if pd.isna(word):
         return ""
