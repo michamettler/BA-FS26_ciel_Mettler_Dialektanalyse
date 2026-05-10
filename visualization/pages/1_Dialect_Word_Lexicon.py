@@ -11,7 +11,6 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import _lexicon_detail as detail  # noqa: E402
 import _lexicon_overview as overview  # noqa: E402
