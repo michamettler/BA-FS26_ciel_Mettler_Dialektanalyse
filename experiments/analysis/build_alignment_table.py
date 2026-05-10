@@ -73,7 +73,7 @@ def load_and_filter() -> pd.DataFrame:
 
 
 def _tokenize(text: str) -> list[str]:
-    return [w for w in clean_word(text).split() if w]
+    return [w for w in (clean_word(t) for t in text.split()) if w]
 
 
 def align_pair(reference: str, hypothesis: str) -> list[dict]:

@@ -15,6 +15,13 @@ def cost_for_word_pair_by_similarity(similarity: float) -> float:
     return 1 - similarity
 
 
+def similarity_for_word_pair_by_cost(cost: float) -> float:
+    """Convert a cost to a similarity (inverse of `cost_for_word_pair_by_similarity`).
+    Similarity = (1 - cost).
+    """
+    return 1 - cost
+
+
 def scale_cost_for_networkx(cost: float) -> int:
     """Convert the theoretical cost to an integer cost for the network flow algorithm.
     Cost = cost * COST_SCALE, rounded to the nearest integer.
@@ -118,6 +125,5 @@ class WordSimilarityCalculator:
             return linear_similarity ** 2 if self.use_squared_positional else linear_similarity
         return 1.0
 
-    def cost_for_epsilon_by_penalty(self) -> int:
-        """Convert an epsilon penalty to an integer cost for the network flow algorithm."""
-        return scale_cost_for_networkx(self.lambda_)
+    def cost_for_epsilon_by_penalty(self) -> float:
+        return self.lambda_
