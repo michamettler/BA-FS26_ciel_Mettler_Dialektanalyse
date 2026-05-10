@@ -12,6 +12,7 @@ from word_similarity_calculator import (
     WordSimilarityCalculator,
     cost_for_word_pair_by_similarity,
     scale_cost_for_networkx,
+    similarity_for_word_pair_by_cost,
 )
 
 
@@ -201,6 +202,18 @@ class TestWordSimilarityCalculator(unittest.TestCase):
         self.assertAlmostEqual(cost_for_word_pair_by_similarity(0.75), 0.25)
         self.assertAlmostEqual(cost_for_word_pair_by_similarity(0.5), 0.5)
         self.assertAlmostEqual(cost_for_word_pair_by_similarity(0.1), 0.9)
+
+    # similarity
+    
+    def test_similarity_for_word_pair_is_one_minus_cost(self):
+        self.assertAlmostEqual(similarity_for_word_pair_by_cost(0.25), 0.75)
+        self.assertAlmostEqual(similarity_for_word_pair_by_cost(0.5), 0.5)
+        self.assertAlmostEqual(similarity_for_word_pair_by_cost(0.9), 0.1)
+
+    def test_cost_and_similarity_converters_are_mutual_inverses(self):
+        for x in (0.0, 0.1, 0.45, 0.55, 1.0):
+            self.assertAlmostEqual(similarity_for_word_pair_by_cost(cost_for_word_pair_by_similarity(x)), x)
+            self.assertAlmostEqual(cost_for_word_pair_by_similarity(similarity_for_word_pair_by_cost(x)), x)
 
     # networkx int scaling
 

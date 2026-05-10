@@ -42,7 +42,7 @@ console = Console()
 
 
 def tokenize(text: str) -> list[str]:
-    return [w for w in clean_word(text).split() if w]
+    return [w for w in (clean_word(t) for t in text.split()) if w]
 
 
 def solver_prefill(ref: list[str], hyp: list[str], alpha: float, lambda_: float,

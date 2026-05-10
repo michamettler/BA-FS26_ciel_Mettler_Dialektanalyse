@@ -8,7 +8,11 @@ import streamlit as st
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "scripts" / "domain"))
 
-from word_similarity_calculator import WordSimilarityCalculator, cost_for_word_pair_by_similarity  # noqa: E402, F401
+from word_similarity_calculator import (  # noqa: E402, F401
+    WordSimilarityCalculator,
+    cost_for_word_pair_by_similarity,
+    similarity_for_word_pair_by_cost,
+)
 
 ALIGN_DIR = PROJECT_ROOT / "experiments" / "analysis"
 DAT_PARQUET = ALIGN_DIR / "train_all_alignments_dialect-aware.parquet"
@@ -41,7 +45,7 @@ def deletion_similarity() -> float:
     the same similarity it would have contributed in cost-domain (`1 − λ`), keeping the analysis
     consistent with the matcher's ε-edge cost.
     """
-    return cost_for_word_pair_by_similarity(epsilon_cost())
+    return similarity_for_word_pair_by_cost(epsilon_cost())
 
 
 @st.cache_data

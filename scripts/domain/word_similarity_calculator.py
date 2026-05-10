@@ -15,6 +15,13 @@ def cost_for_word_pair_by_similarity(similarity: float) -> float:
     return 1 - similarity
 
 
+def similarity_for_word_pair_by_cost(cost: float) -> float:
+    """Convert a cost to a similarity (inverse of `cost_for_word_pair_by_similarity`).
+    Similarity = (1 - cost).
+    """
+    return 1 - cost
+
+
 def scale_cost_for_networkx(cost: float) -> int:
     """Convert the theoretical cost to an integer cost for the network flow algorithm.
     Cost = cost * COST_SCALE, rounded to the nearest integer.
