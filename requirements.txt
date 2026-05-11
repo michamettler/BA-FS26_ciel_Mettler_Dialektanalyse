@@ -9,6 +9,7 @@ jupyter
 ipykernel
 nbformat
 gradio_client
+tqdm
 levenshtein
 transformers
 seaborn
