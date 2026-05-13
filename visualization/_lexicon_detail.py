@@ -12,7 +12,7 @@ _REPO_ROOT = _VIS_DIR.parent
 sys.path.insert(0, str(_REPO_ROOT / "scripts" / "domain"))
 sys.path.insert(0, str(_REPO_ROOT / "scripts" / "utils"))
 sys.path.insert(0, str(_VIS_DIR))
-from _data import LAMBDA, REGIONS, tfidf_matrix_pairs  # noqa: E402
+from _data import AUDIO_ROOTS, LAMBDA, REGIONS, tfidf_matrix_pairs  # noqa: E402
 from bipartite_matching import build_full_bipartite_graph, solve_matching  # noqa: E402
 from plot_helpers import plot_reduced_bipartite_graph_with_matching  # noqa: E402
 from preprocessing import clean_word  # noqa: E402
@@ -240,21 +240,58 @@ def render_word_chart(word_rows: pd.DataFrame) -> None:
     st.altair_chart(variant_chart, use_container_width=True)
 
 
-def render_example_sentences(df_view: pd.DataFrame, word_rows: pd.DataFrame, word: str) -> None:
-    """Region-grouped, paginated expanders showing reference/hypotheses with word-level alignment."""
+def render_example_sentences(df_view: pd.DataFrame, word_rows: pd.DataFrame, word: str,
+                              selected_regions: list[str], include_preterite: bool) -> None:
+    """Sentences grouped by DIT hypothesis (TF-IDF desc). Two-level pagination: outer pager
+    selects which variants to show; each variant is a collapsible expander with its own inner
+    sentence pager. Matches and deletions sort to the bottom (TF-IDF = 0).
+    """
+    dit_rows = word_rows[word_rows["model"] == "dialect-ignorant"]
+    # Dedupe on (path, _variant) so sentences with multiple occurrences of the searched word
+    # appear under every variant they actually aligned to.
     unique_paths = (
-        word_rows.drop_duplicates("path")[
-            ["path", "dialect_region", "gender", "age",
-             "reference", "dat_hypothesis", "dit_hypothesis"]
-        ]
-        .assign(_region_idx=lambda d: d["dialect_region"].map(
-            lambda r: REGIONS.index(r) if r in REGIONS else len(REGIONS)
-        ))
-        .sort_values(["_region_idx", "path"])
-        .reset_index(drop=True)
+        dit_rows
+        .assign(
+            _variant=lambda d: d["hypothesis_word"].fillna("(deletion)"),
+            _region_idx=lambda d: d["dialect_region"].map(
+                lambda r: REGIONS.index(r) if r in REGIONS else len(REGIONS)
+            ),
+        )
+        .drop_duplicates(["path", "_variant"])
+        [["path", "hypothesis_word", "_variant", "_region_idx",
+          "dialect_region", "gender", "age",
+          "reference", "dat_hypothesis", "dit_hypothesis"]]
     )
 
-    st.markdown(f"**Sentences with word-level alignment**: {len(unique_paths):,} sentences")
+    dit_table = _hypothesis_table(dit_rows, word, "dialect-ignorant", selected_regions, include_preterite)
+    available_variants = set(unique_paths["_variant"].unique())
+    variant_order = [
+        v for v in dit_table["hypothesis_word"].fillna("(deletion)").tolist()
+        if v in available_variants
+    ]
+
+    n_unique_sentences = unique_paths["path"].nunique()
+    st.markdown(f"**Sentences with word-level alignment**: {n_unique_sentences:,} sentences "
+                f"across {len(variant_order)} DIT variants")
+
+    # Outer paginator for variants: 10 per page.
+    variant_page_size = 10
+    n_variant_pages = max(1, (len(variant_order) + variant_page_size - 1) // variant_page_size)
+    if n_variant_pages > 1:
+        variant_page = st.selectbox(
+            "Variant page",
+            options=list(range(1, n_variant_pages + 1)),
+            format_func=lambda p, n=n_variant_pages, total=len(variant_order): (
+                f"Page {p} of {n} (variants {(p - 1) * variant_page_size + 1}"
+                f"–{min(p * variant_page_size, total)})"
+            ),
+            key=f"variant_page_{word}",
+            label_visibility="collapsed",
+        )
+    else:
+        variant_page = 1
+    variant_start = (variant_page - 1) * variant_page_size
+    variants_on_page = variant_order[variant_start:variant_start + variant_page_size]
 
     rows_by_path = dict(tuple(
         df_view[df_view["path"].isin(set(unique_paths["path"]))]
@@ -262,36 +299,60 @@ def render_example_sentences(df_view: pd.DataFrame, word_rows: pd.DataFrame, wor
     ))
 
     page_size = 15
-    for region in unique_paths["dialect_region"].unique():
-        region_paths = unique_paths[unique_paths["dialect_region"] == region].reset_index(drop=True)
-        n_region = len(region_paths)
-        st.markdown(f"#### {region} ({n_region})")
+    for i, variant in enumerate(variants_on_page):
+        variant_paths = (
+            unique_paths[unique_paths["_variant"] == variant]
+            .sort_values(["_region_idx", "path"])
+            .reset_index(drop=True)
+        )
+        n_variant = len(variant_paths)
+        variant_idx = variant_start + i
 
-        n_pages = max(1, (n_region + page_size - 1) // page_size)
-        if n_pages > 1:
-            page = st.selectbox(
-                "Page",
-                options=list(range(1, n_pages + 1)),
-                format_func=lambda p, n=n_pages, r=n_region: (
-                    f"Page {p} of {n} (sentences {(p - 1) * page_size + 1}–{min(p * page_size, r)})"
-                ),
-                key=f"page_{word}_{region}",
-                label_visibility="collapsed",
-            )
-        else:
-            page = 1
-        start = (page - 1) * page_size
-        page_paths = region_paths.iloc[start:start + page_size]
+        with st.expander(f"**DIT: `{variant}`** ({n_variant})", expanded=True):
+            n_pages = max(1, (n_variant + page_size - 1) // page_size)
+            if n_pages > 1:
+                page = st.selectbox(
+                    "Page",
+                    options=list(range(1, n_pages + 1)),
+                    format_func=lambda p, n=n_pages, r=n_variant: (
+                        f"Page {p} of {n} (sentences {(p - 1) * page_size + 1}–{min(p * page_size, r)})"
+                    ),
+                    key=f"page_{word}_{variant_idx}",
+                    label_visibility="collapsed",
+                )
+            else:
+                page = 1
+            start = (page - 1) * page_size
+            page_paths = variant_paths.iloc[start:start + page_size]
 
-        for _, row in page_paths.iterrows():
-            _render_example_sentence_expander(row, rows_by_path[row["path"]], word)
+            for _, row in page_paths.iterrows():
+                _render_example_sentence_expander(row, rows_by_path[row["path"]], word)
+
+
+@st.cache_data
+def _resolve_audio_path(rel_path: str) -> Path | None:
+    """Return the first existing audio file across AUDIO_ROOTS, or None if not found.
+    Cached: AUDIO_ROOTS are static, so each path is stat-probed at most once per session.
+    """
+    for root in AUDIO_ROOTS:
+        candidate = root / rel_path
+        if candidate.exists():
+            return candidate
+    return None
 
 
 def _render_example_sentence_expander(row: pd.Series, sentence_rows: pd.DataFrame, word: str) -> None:
-    """One sentence expander: clip metadata, reference + hypotheses, alignment HTML, optional graph."""
+    """One sentence expander: region + clip metadata, audio player, reference + hypotheses, alignment HTML, and an optional technical alignment graph."""
     path = row["path"]
-    with st.expander(f"{row['gender']} · {row['age']} · …{path[-12:]}"):
+    with st.expander(f"**{row['dialect_region']}** · {row['gender']} · {row['age']} · …{path[-12:]}"):
         st.markdown(f"**Clip ID:** `{path}`")
+
+        audio_file = _resolve_audio_path(path)
+        if audio_file is not None:
+            st.audio(str(audio_file))
+        else:
+            st.caption(f"Audio file not found locally: `{path}`")
+
         st.markdown(
             f"**Reference:** {row['reference']}  \n"
             f"**Hypothesis DIT:** {row['dit_hypothesis']}  \n"

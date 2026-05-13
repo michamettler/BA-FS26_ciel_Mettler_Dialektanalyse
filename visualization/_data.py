@@ -40,6 +40,10 @@ DIT_PARQUET = ALIGN_DIR / "train_all_alignments_dialect-ignorant.parquet"
 DAT_TSV = PROJECT_ROOT / "transcripts" / "dialect-aware" / "fhnw" / "stt4sg" / "train_all_transcribed.tsv"
 DIT_TSV = PROJECT_ROOT / "transcripts" / "dialect-ignorant" / "whisper-large-v2" / "stt4sg" / "train_all_enriched_transcribed_praet.tsv"
 BALANCED_TSV = PROJECT_ROOT / "datasets" / "STT4SG-350 v2.1" / "train_balanced.tsv"
+AUDIO_ROOTS = (
+    PROJECT_ROOT / "datasets" / "STT4SG-350 v2.1" / "clips__train_valid-001",
+    PROJECT_ROOT / "datasets" / "STT4SG-350 v2.1" / "clips__test",
+)
 
 REGIONS = ["Wallis", "Zürich", "Bern", "Basel", "Graubünden", "Innerschweiz", "Ostschweiz"]
 
