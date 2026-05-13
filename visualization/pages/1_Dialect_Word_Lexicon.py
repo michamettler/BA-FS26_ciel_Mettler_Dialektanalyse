@@ -79,7 +79,7 @@ def render_detail(df_view: pd.DataFrame, word: str, regions: list[str],
     detail.render_header(word, word_rows, regions)
     detail.render_word_chart(word_rows)
     detail.render_hypothesis_tables(word, word_rows, regions, include_preterite)
-    detail.render_example_sentences(df_view, word_rows, word)
+    detail.render_example_sentences(df_view, word_rows, word, regions, include_preterite)
 
 
 def render_overview(df_view: pd.DataFrame, regions: list[str], include_preterite: bool) -> None:
