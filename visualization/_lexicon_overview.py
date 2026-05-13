@@ -1,72 +1,97 @@
-"""Word-cloud overview for the Dialect Word Lexicon page.
-
-Implementation methods for the dialect-candidate word cloud and its supporting
-top-table: reference words where DAT outperforms DIT (Δ > 0) across the active
-region filter.
-"""
+"""Word-cloud overview for the Dialect Word Lexicon page."""
+import numpy as np
 import pandas as pd
 import streamlit as st
-from streamlit_echarts import st_echarts
+from streamlit_echarts import JsCode, st_echarts
 
-from _data import deletion_similarity
+from _data import REGION_COLORS, tfidf_matrix_pairs
 
-_TABLE_COLUMNS = ["word", "count", "DAT mean sim per ref word", "DIT mean sim per ref word",
-                  "sim delta per ref word (DAT − DIT)"]
+_TABLE_COLUMNS = ["pair", "TF-IDF", "peak region", "count"]
+_TOP_N = 200
+
+
+def _decode_pair(p: str) -> str:
+    """'ref+hyp' (internal) → 'ref → hyp' (display)."""
+    ref, hyp = p.split("+", 1)
+    return f"{ref} → {hyp}"
 
 
 def render_caption() -> None:
     """Section header and explanatory text above the word cloud."""
     st.markdown("### Word Cloud for Dialect Specific Candidates")
     st.markdown(
-        "Reference words ranked by **sim delta per ref word (DAT − DIT)** across the selected "
-        "regions, restricted to words above the minimum-occurrences threshold (sidebar). "
-        "Means are computed as the average over all DAT/DIT alignments for the reference "
-        "word. Larger Delta means that DIT struggles more than DAT on this word, which indicates a "
-        "dialect-specific word. Only deltas > 0 are displayed."
+        "(ref, DIT-hyp) pairs ranked by their **TF-IDF** score across the selected regions (treated as documents). "
+        "Surfaces pairs most distinct to their specific region. Hover a pair to see its score, peak region, and count."
     )
 
 
-def compute_top_table(df_view: pd.DataFrame, min_count_threshold: int) -> pd.DataFrame:
-    """Top-200 reference words ranked by sim delta per ref word (DAT − DIT).
-
-    Filters: insertions (ref_word = NaN) excluded; reference words must appear at least
-    `min_count_threshold` times in the selected regions; only positive deltas (DAT outperforms DIT).
-    Deletions count toward the mean with similarity = 1 − λ, matching the solver's ε cost.
-    Returns an empty DataFrame (with the expected columns) if no candidates pass the filters.
-    """
-    rows = df_view[df_view["reference_word"].notna()].copy()
-    if rows.empty:
+def compute_top_table(df_view: pd.DataFrame, selected_regions: list[str], include_preterite: bool
+                      ) -> pd.DataFrame:
+    """Top-N (ref, DIT-hyp)-pairs ranked by max TF-IDF across the selected regions."""
+    matrix, vocab, _word_to_idx, region_order = tfidf_matrix_pairs(include_preterite)
+    selected_idx = [i for i, r in enumerate(region_order) if r in selected_regions]
+    if not selected_idx:
         return pd.DataFrame(columns=_TABLE_COLUMNS)
-    rows["similarity"] = rows["similarity"].fillna(deletion_similarity())
 
-    sim = rows.pivot_table(
-        index="reference_word", columns="model", values="similarity", aggfunc="mean"
+    sub_matrix = matrix[selected_idx, :]
+    scores = sub_matrix.max(axis=0)
+    nonzero = np.flatnonzero(scores > 0)
+    if nonzero.size == 0:
+        return pd.DataFrame(columns=_TABLE_COLUMNS)
+    order = nonzero[np.argsort(-scores[nonzero])][:_TOP_N]
+
+    peak_region_indices = sub_matrix.argmax(axis=0)
+    selected_region_names = [region_order[i] for i in selected_idx]
+
+    counts_by_pair_region = (
+        df_view[df_view["model"] == "dialect-ignorant"]
+        .dropna(subset=["hypothesis_word", "reference_word"])
+        .pipe(lambda d: d[
+            d["reference_word"] != d["hypothesis_word"]])  # filter out matches where ref and hyp are the same word
+        .assign(pair=lambda d: d["reference_word"] + "+" + d["hypothesis_word"])
+        .groupby(["pair", "dialect_region"])
+        .size()
+        .unstack(fill_value=0)
     )
-    counts = rows[rows["model"] == "dialect-aware"].groupby("reference_word").size()
-    delta = (sim.get("dialect-aware") - sim.get("dialect-ignorant")).dropna()
-    delta = delta[counts >= min_count_threshold]
-    delta = delta[delta > 0].sort_values(ascending=False).head(200)
 
-    if delta.empty:
-        return pd.DataFrame(columns=_TABLE_COLUMNS)
+    def peak_over_total(pair_str: str, peak_region: str) -> str:
+        if pair_str not in counts_by_pair_region.index:
+            return "0/0"
+        row = counts_by_pair_region.loc[pair_str]
+        return f"{int(row.get(peak_region, 0))}/{int(row.sum())}"
 
     return pd.DataFrame({
-        "word": delta.index,
-        "count": [int(counts[w]) for w in delta.index],
-        "DAT mean sim per ref word": [round(sim.loc[w, "dialect-aware"], 3) for w in delta.index],
-        "DIT mean sim per ref word": [round(sim.loc[w, "dialect-ignorant"], 3) for w in delta.index],
-        "sim delta per ref word (DAT − DIT)": delta.round(3).values,
+        "pair": [_decode_pair(vocab[i]) for i in order],
+        "TF-IDF": scores[order],
+        "peak region": [selected_region_names[int(peak_region_indices[i])] for i in order],
+        "count": [
+            peak_over_total(vocab[i], selected_region_names[int(peak_region_indices[i])])
+            for i in order
+        ],
     })
 
 
 def render_word_cloud(table: pd.DataFrame) -> None:
-    """Echarts word cloud where token size encodes delta."""
+    """Word cloud sized by TF-IDF, colored by peak region; hover shows score and count."""
     cloud_data = [
-        {"name": str(row["word"]), "value": float(row["sim delta per ref word (DAT − DIT)"])}
+        {
+            "name": str(row["pair"]),
+            "value": float(row["TF-IDF"]),
+            "peak": str(row["peak region"]),
+            "count": str(row["count"]),
+            "textStyle": {"color": REGION_COLORS.get(row["peak region"], "#333")},
+        }
         for _, row in table.iterrows()
     ]
     option = {
-        "tooltip": {"show": True},
+        "tooltip": {
+            "show": True,
+            "formatter": JsCode(
+                "function(p){return p.name + '<br/>TF-IDF: ' + p.value.toFixed(5) + "
+                "'<br/>peak: ' + (p.data.peak || '—') + "
+                "'<br/>count: ' + p.data.count;}"
+            ),
+        },
         "series": [{
             "type": "wordCloud",
             "shape": "circle",
@@ -87,38 +112,48 @@ def render_word_cloud(table: pd.DataFrame) -> None:
         }],
     }
     st_echarts(options=option, height="520px")
+    _render_region_legend(table)
+
+
+def _render_region_legend(table: pd.DataFrame) -> None:
+    """Inline color legend below the cloud, listing only regions that appear as peaks."""
+    peaks_in_view = [r for r in REGION_COLORS if (table["peak region"] == r).any()]
+    if not peaks_in_view:
+        return
+    swatches = " &nbsp; ".join(
+        f'<span style="display:inline-block;width:12px;height:12px;background:{REGION_COLORS[r]};'
+        f'margin-right:4px;vertical-align:middle;border-radius:2px;"></span>{r}'
+        for r in peaks_in_view
+    )
+    st.markdown(
+        f'<div style="text-align:center;font-size:0.9em;color:#333;">{swatches}</div>',
+        unsafe_allow_html=True,
+    )
 
 
 def render_top_candidates_expander(table: pd.DataFrame) -> None:
-    """Collapsible table listing the top dialect-candidate words with per-model similarities."""
-    deletion_sim = deletion_similarity()
+    """Collapsible table listing the top regionally distinctive substitution pairs."""
     column_config = {
-        "word": st.column_config.TextColumn(
-            help="Standard German reference word.",
+        "pair": st.column_config.TextColumn(
+            help="(ref, DIT-hyp) pair: Standard German reference word -> DIT (Whisper) hypothesis.",
         ),
-        "count": st.column_config.NumberColumn(
-            help="Number of times this reference word appears in the selected regions "
-                 "(the minimum-occurrences threshold).",
+        "TF-IDF": st.column_config.NumberColumn(
+            help="For each pair, the highest TF-IDF across the selected regions is shown. "
+                 "Documents = all 7 dialect regions; terms = (ref, DIT-hyp) pairs. "
+                 "Higher = pair is more distinct to its specific region.",
+            format="%.5f",
         ),
-        "DAT mean sim per ref word": st.column_config.NumberColumn(
-            help="Mean DAT similarity per reference word: average similarity across all alignments for this reference "
-                 "word in the selected regions.",
+        "peak region": st.column_config.TextColumn(
+            help="The selected region where this pair's TF-IDF is highest.",
         ),
-        "DIT mean sim per ref word": st.column_config.NumberColumn(
-            help="Mean DIT similarity per reference word: average similarity "
-                 "across all alignments for this reference word in the selected regions.",
-        ),
-        "sim delta per ref word (DAT − DIT)": st.column_config.NumberColumn(
-            help="Similarity delta per reference word: DAT mean similarity per reference word − "
-                 "DIT mean similarity per reference word.",
+        "count": st.column_config.TextColumn(
+            help="Count in highest TF-IDF region / total count across the selected regions.",
         ),
     }
     with st.expander("Top Dialect Specific Candidates"):
         st.caption(
-            "Top reference words where DAT outperforms DIT across the selected regions, which indicates a "
-            "dialect-specific candidate.")
-        st.dataframe(table, use_container_width=True, hide_index=True, column_config=column_config)
-        st.caption("Default ordering: descending by **sim delta per ref word (DAT − DIT)**.")
-        st.caption(
-            f"Deletions count with similarity = 1 − λ = {deletion_sim:.2f}, matching the solver's ε cost."
+            "(ref, DIT-hyp) pairs ranked by TF-IDF (max across selected regions). "
+            "Surfaces pairs most distinct to their specific region."
         )
+        st.dataframe(table, use_container_width=True, hide_index=True, column_config=column_config)
+        st.caption("Default ordering: descending by **TF-IDF**.")

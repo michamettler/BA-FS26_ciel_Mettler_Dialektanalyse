@@ -1,9 +1,4 @@
-"""Detail view for the Dialect Word Lexicon page.
-
-Renders the per-reference-word breakdown: hypothesis-variant tables, regional
-charts, mean-similarity-per-region table, and paginated example-sentence
-expanders with word-level alignment HTML.
-"""
+"""Detail view for the Dialect Word Lexicon page."""
 import html
 import sys
 from pathlib import Path
@@ -17,7 +12,7 @@ _REPO_ROOT = _VIS_DIR.parent
 sys.path.insert(0, str(_REPO_ROOT / "scripts" / "domain"))
 sys.path.insert(0, str(_REPO_ROOT / "scripts" / "utils"))
 sys.path.insert(0, str(_VIS_DIR))
-from _data import DAT_COLOR, DIT_COLOR, LAMBDA, REGIONS, deletion_similarity  # noqa: E402
+from _data import LAMBDA, REGIONS, tfidf_matrix_pairs  # noqa: E402
 from bipartite_matching import build_full_bipartite_graph, solve_matching  # noqa: E402
 from plot_helpers import plot_reduced_bipartite_graph_with_matching  # noqa: E402
 from preprocessing import clean_word  # noqa: E402
@@ -40,10 +35,10 @@ _HYPOTHESIS_TABLE_COLUMN_CONFIG = {
              "reference word was matched with this specific hypothesis variant. Higher = the variant is lexically and "
              "positionally close to the reference.",
     ),
-    "count * (1 − mean sim)": st.column_config.NumberColumn(
-        help="Count * (1 − mean similarity per hypothesis word): frequency-weighted distance, "
-             "prioritizing variants that are both frequent AND linguistically distant from the "
-             "reference. High values = strong dialect-specific candidates.",
+    "TF-IDF": st.column_config.NumberColumn(
+        help="Highest TF-IDF of the (ref, DIT-hyp) pair across the selected "
+             "regions. Matches the word-cloud metric.",
+        format="%.5f",
     ),
 }
 
@@ -76,20 +71,36 @@ def _back_to_cloud():
     st.session_state["selected_word"] = ""
 
 
-def _hypothesis_table(slice_df: pd.DataFrame) -> pd.DataFrame:
-    """Hypothesis dialect-specific variants (DIT and DAT) with count, per-variant mean similarity,
-    and frequency-weighted distance: variants that are both frequent AND linguistically distant from the reference.
-    """
+def _hypothesis_table(slice_df: pd.DataFrame, ref_word: str, model: str,
+                      selected_regions: list[str], include_preterite: bool) -> pd.DataFrame:
+    """Hypothesis variants with count, per-variant mean similarity & TF-IDF score. Sorted by TF-IDF.
+    TF-IDF only for DIT-variants, not DAT-variants."""
     out = (
         slice_df.groupby("hypothesis_word", dropna=False)
         .agg(count=("path", "size"), mean_sim=("similarity", "mean"))
         .reset_index()
     )
-    out["count * (1 − mean sim)"] = (out["count"] * (1 - out["mean_sim"])).round(2)
     out["mean sim"] = out["mean_sim"].round(3)
+
+    if model == "dialect-aware":
+        return (
+            out[["hypothesis_word", "count", "mean sim"]]
+            .sort_values("count", ascending=False)
+        )
+
+    matrix, _vocab, word_to_idx, region_order = tfidf_matrix_pairs(include_preterite)
+    selected_idx = [i for i, r in enumerate(region_order) if r in selected_regions]
+
+    def lookup(hyp):
+        if pd.isna(hyp) or hyp == ref_word or not selected_idx:
+            return 0.0
+        col = word_to_idx.get(f"{ref_word}+{hyp}")
+        return float(matrix[selected_idx, col].max()) if col is not None else 0.0
+
+    out["TF-IDF"] = out["hypothesis_word"].apply(lookup).round(5)
     return (
-        out[["hypothesis_word", "count", "mean sim", "count * (1 − mean sim)"]]
-        .sort_values("count * (1 − mean sim)", ascending=False)
+        out[["hypothesis_word", "count", "mean sim", "TF-IDF"]]
+        .sort_values("TF-IDF", ascending=False)
     )
 
 
@@ -163,23 +174,30 @@ def render_header(word: str, word_rows: pd.DataFrame, selected_regions: list[str
                f"(in {len(selected_regions)} selected region(s))")
 
 
-def render_hypothesis_tables(word_rows: pd.DataFrame) -> None:
-    """Side-by-side DAT/DIT hypothesis-variant tables for the searched reference word."""
-    col_dat, col_dit = st.columns(2)
-    with col_dat:
-        st.markdown("**Dialect-Aware-Transcript (DAT, FHNW STT4SG)**")
-        st.caption("Hypothesis variants the DAT model produced as the alignment of the searched reference word.")
-        dat_table = _hypothesis_table(word_rows[word_rows["model"] == "dialect-aware"])
-        st.dataframe(dat_table, use_container_width=True, hide_index=True,
-                     column_config=_HYPOTHESIS_TABLE_COLUMN_CONFIG)
-        st.caption("Default ordering: descending by **count * (1 − mean sim)**.")
+def render_hypothesis_tables(word: str, word_rows: pd.DataFrame, selected_regions: list[str],
+                             include_preterite: bool) -> None:
+    """Side-by-side DIT/DAT hypothesis-variant tables for the searched reference word."""
+    col_dit, col_dat = st.columns(2)
     with col_dit:
         st.markdown("**Dialect-Ignorant-Transcript (DIT, Whisper-large-v2)**")
         st.caption("Hypothesis variants the DIT model produced as the alignment of the searched reference word.")
-        dit_table = _hypothesis_table(word_rows[word_rows["model"] == "dialect-ignorant"])
+        dit_table = _hypothesis_table(
+            word_rows[word_rows["model"] == "dialect-ignorant"],
+            word, "dialect-ignorant", selected_regions, include_preterite,
+        )
         st.dataframe(dit_table, use_container_width=True, hide_index=True,
                      column_config=_HYPOTHESIS_TABLE_COLUMN_CONFIG)
-        st.caption("Default ordering: descending by **count * (1 − mean sim)**.")
+        st.caption("Default ordering: descending by **TF-IDF**.")
+    with col_dat:
+        st.markdown("**Dialect-Aware-Transcript (DAT, FHNW STT4SG)**")
+        st.caption("Hypothesis variants the DAT model produced as the alignment of the searched reference word.")
+        dat_table = _hypothesis_table(
+            word_rows[word_rows["model"] == "dialect-aware"],
+            word, "dialect-aware", selected_regions, include_preterite,
+        )
+        st.dataframe(dat_table, use_container_width=True, hide_index=True,
+                     column_config=_HYPOTHESIS_TABLE_COLUMN_CONFIG)
+        st.caption("Default ordering: descending by **count**.")
 
 
 def render_word_chart(word_rows: pd.DataFrame) -> None:
@@ -220,94 +238,6 @@ def render_word_chart(word_rows: pd.DataFrame) -> None:
         .properties(height=340, title="DIT variants per region")
     )
     st.altair_chart(variant_chart, use_container_width=True)
-
-
-def _compute_regional_similarity_delta(word_rows: pd.DataFrame) -> pd.DataFrame | None:
-    """Per-region mean DAT/DIT similarity (with ε imputation) plus delta column. Sorted by delta desc."""
-    if word_rows.empty:
-        return None
-    rows = word_rows.assign(similarity=word_rows["similarity"].fillna(deletion_similarity()))
-    delta = (
-        rows.pivot_table(
-            index="dialect_region", columns="model",
-            values="similarity", aggfunc="mean",
-        )
-        .reindex(columns=["dialect-aware", "dialect-ignorant"])
-    )
-    delta["sim delta per region (DAT − DIT)"] = delta["dialect-aware"] - delta["dialect-ignorant"]
-    return delta.sort_values("sim delta per region (DAT − DIT)", ascending=False)
-
-
-def render_regional_similarity_table(word_rows: pd.DataFrame) -> None:
-    """Mean DAT/DIT similarity per region with delta column, sorted by delta desc."""
-    delta = _compute_regional_similarity_delta(word_rows)
-    if delta is None:
-        return
-
-    deletion_sim = deletion_similarity()
-    column_config = {
-        "DAT mean sim per region": st.column_config.NumberColumn(
-            help="Mean DAT similarity per region: average similarity across all "
-                 "alignments in this region for the searched reference word.",
-        ),
-        "DIT mean sim per region": st.column_config.NumberColumn(
-            help="Mean DIT similarity per region: average similarity across all "
-                 "alignments in this region for the searched reference word.",
-        ),
-        "sim delta per region (DAT − DIT)": st.column_config.NumberColumn(
-            help="Similarity delta per region: DAT mean similarity per region − DIT mean similarity per region.",
-        ),
-    }
-
-    st.markdown("**Mean similarity per region**")
-    st.caption(
-        "Per-region average similarity for the searched reference word, broken down by DAT vs DIT.")
-    display = delta.rename(columns={
-        "dialect-aware": "DAT mean sim per region",
-        "dialect-ignorant": "DIT mean sim per region",
-    })
-    st.dataframe(
-        display.round(3).reset_index(),
-        use_container_width=True,
-        hide_index=True,
-        column_config=column_config,
-    )
-    st.caption("Default ordering: descending by **sim delta per region (DAT − DIT)**.")
-    st.caption(
-        "Larger Delta means that DIT struggles more than DAT on this word, which indicates a dialect-specific word. "
-        f"Deletions count with similarity = 1 − λ = {deletion_sim:.2f}, matching the solver's ε cost."
-    )
-
-
-def render_regional_similarity_chart(word_rows: pd.DataFrame) -> None:
-    """Bar chart of per-region similarity delta (DAT mean − DIT mean), sorted by delta desc."""
-    delta = _compute_regional_similarity_delta(word_rows)
-    if delta is None:
-        return
-    region_order = delta.index.tolist()
-    delta_df = (
-        delta["sim delta per region (DAT − DIT)"]
-        .rename("delta")
-        .reset_index()
-        .dropna()
-    )
-    delta_bar = (
-        alt.Chart(delta_df)
-        .mark_bar(opacity=0.9)
-        .encode(
-            x=alt.X("dialect_region:N", sort=region_order, title=None,
-                    axis=alt.Axis(labelAngle=0, labelOverlap=False)),
-            y=alt.Y("delta:Q", title="Sim delta per region (DAT − DIT)"),
-            color=alt.condition(alt.datum.delta >= 0, alt.value(DIT_COLOR), alt.value(DAT_COLOR)),
-            tooltip=[
-                alt.Tooltip("dialect_region:N", title="Region"),
-                alt.Tooltip("delta:Q", format=".3f", title="Sim delta per region (DAT − DIT)"),
-            ],
-        )
-    )
-    zero = alt.Chart(pd.DataFrame({"y": [0]})).mark_rule(strokeWidth=0.6, color="black").encode(y="y:Q")
-    st.markdown("**Similarity delta per region**")
-    st.altair_chart((delta_bar + zero).properties(height=280), use_container_width=True)
 
 
 def render_example_sentences(df_view: pd.DataFrame, word_rows: pd.DataFrame, word: str) -> None:
