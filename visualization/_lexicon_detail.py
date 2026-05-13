@@ -323,7 +323,7 @@ def render_example_sentences(df_view: pd.DataFrame, word_rows: pd.DataFrame, wor
 
 
 def _render_example_sentence_expander(row: pd.Series, sentence_rows: pd.DataFrame, word: str) -> None:
-    """One sentence expander: region + clip metadata, reference + hypotheses, alignment HTML."""
+    """One sentence expander: region + clip metadata, reference + hypotheses, alignment HTML, and an optional technical alignment graph."""
     path = row["path"]
     with st.expander(f"**{row['dialect_region']}** · {row['gender']} · {row['age']} · …{path[-12:]}"):
         st.markdown(f"**Clip ID:** `{path}`")
