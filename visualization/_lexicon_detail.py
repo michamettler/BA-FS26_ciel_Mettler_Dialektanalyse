@@ -293,13 +293,14 @@ def render_example_sentences(df_view: pd.DataFrame, word_rows: pd.DataFrame, wor
     ))
 
     page_size = 15
-    for variant in variants_on_page:
+    for i, variant in enumerate(variants_on_page):
         variant_paths = (
             unique_paths[unique_paths["_variant"] == variant]
             .sort_values(["_region_idx", "path"])
             .reset_index(drop=True)
         )
         n_variant = len(variant_paths)
+        variant_idx = variant_start + i
 
         with st.expander(f"**DIT: `{variant}`** ({n_variant})", expanded=True):
             n_pages = max(1, (n_variant + page_size - 1) // page_size)
@@ -310,7 +311,7 @@ def render_example_sentences(df_view: pd.DataFrame, word_rows: pd.DataFrame, wor
                     format_func=lambda p, n=n_pages, r=n_variant: (
                         f"Page {p} of {n} (sentences {(p - 1) * page_size + 1}–{min(p * page_size, r)})"
                     ),
-                    key=f"page_{word}_{variant}",
+                    key=f"page_{word}_{variant_idx}",
                     label_visibility="collapsed",
                 )
             else:
