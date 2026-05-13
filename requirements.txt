@@ -17,3 +17,4 @@ rich
 streamlit
 streamlit-echarts
 text2num
+scikit-learn

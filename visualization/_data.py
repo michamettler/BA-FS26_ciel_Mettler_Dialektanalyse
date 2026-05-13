@@ -1,9 +1,29 @@
 """Shared data layer for the Streamlit visualization pages."""
 import sys
 from pathlib import Path
+from typing import NamedTuple, cast
 
+import numpy as np
 import pandas as pd
 import streamlit as st
+from sklearn.feature_extraction.text import TfidfVectorizer
+
+
+class TfidfResult(NamedTuple):
+    """Region-document TF-IDF artifact: scores matrix + vocab lookups + region row ordering.
+
+    Fields:
+        matrix:       (n_regions, vocab_size) ndarray of TF-IDF scores; rows align with region_order.
+        vocab:        terms ordered by column index.
+        word_to_idx:  term → column index lookup.
+        region_order: region names ordered by row index.
+
+    Tuple-unpackable: `matrix, vocab, word_to_idx, region_order = tfidf_matrix_pairs(...)` still works.
+    """
+    matrix: np.ndarray
+    vocab: list[str]
+    word_to_idx: dict[str, int]
+    region_order: list[str]
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "scripts" / "domain"))
@@ -28,6 +48,16 @@ LAMBDA = 0.45
 
 DAT_COLOR = "#4c72b0"
 DIT_COLOR = "#dd8452"
+
+REGION_COLORS = {
+    "Wallis": "#e41a1c",
+    "Zürich": "#377eb8",
+    "Bern": "#4daf4a",
+    "Basel": "#984ea3",
+    "Graubünden": "#ff7f00",
+    "Innerschweiz": "#dbb500",
+    "Ostschweiz": "#a65628",
+}
 
 
 def epsilon_cost() -> float:
@@ -86,3 +116,39 @@ def load_balanced_paths() -> pd.DataFrame:
     balanced_data = pd.read_csv(BALANCED_TSV, sep="\t", encoding="utf-8-sig")[["path", "dialect_region"]]
     is_praet = pd.read_csv(DIT_TSV, sep="\t", encoding="utf-8-sig", usecols=["path", "is_praeteritum"])
     return balanced_data.merge(is_praet, on="path", how="left")
+
+
+@st.cache_data
+def tfidf_matrix_pairs(include_preterite: bool) -> TfidfResult:
+    """TF-IDF over (ref, DIT-hyp) pairs across the 7 dialect regions.
+    Each ref, hyp pair is one term (encoded as ref+hyp for the vectorizer);
+    a region = document (bag of its pairs).
+    Resulting matrix shape: (7 regions × pairs vocab).
+
+    Vectorizer config:
+        * `sublinear_tf=True`: `1 + log(count)` so hapaxes don't dominate.
+        * `smooth_idf=False`: no IDF +1 smoothing; universal-term contribution stays minimal.
+        * L2 row-norm (sklearn default) — cross-region comparability.
+    """
+    df = joined_view(tuple(REGIONS))
+    if not include_preterite:
+        df = df[~df["is_praeteritum"].fillna(False).astype(bool)]
+    df = df[
+        (df["model"] == "dialect-ignorant")
+        & df["reference_word"].notna()
+        & df["hypothesis_word"].notna()
+        & (df["reference_word"] != df["hypothesis_word"]) # filter out matches where ref and hyp are the same word
+    ]
+    pairs = df["reference_word"] + "+" + df["hypothesis_word"]
+    docs_per_region = [" ".join(pairs[df["dialect_region"] == r]) for r in REGIONS]
+
+    vec = TfidfVectorizer(token_pattern=r"\S+", lowercase=False,
+                          sublinear_tf=True, smooth_idf=False)
+    matrix = vec.fit_transform(docs_per_region).toarray()
+
+    return TfidfResult(
+        matrix=matrix,
+        vocab=vec.get_feature_names_out().tolist(),
+        word_to_idx=cast(dict[str, int], dict(vec.vocabulary_)), # for column lookup from detail view (word selected)
+        region_order=list(REGIONS),
+    )
