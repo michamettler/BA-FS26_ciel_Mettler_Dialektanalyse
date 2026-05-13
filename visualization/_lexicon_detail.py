@@ -247,15 +247,20 @@ def render_example_sentences(df_view: pd.DataFrame, word_rows: pd.DataFrame, wor
     sentence pager. Matches and deletions sort to the bottom (TF-IDF = 0).
     """
     dit_rows = word_rows[word_rows["model"] == "dialect-ignorant"]
+    # Dedupe on (path, _variant) so sentences with multiple occurrences of the searched word
+    # appear under every variant they actually aligned to.
     unique_paths = (
-        dit_rows.drop_duplicates("path")[
-            ["path", "hypothesis_word", "dialect_region", "gender", "age",
-             "reference", "dat_hypothesis", "dit_hypothesis"]
-        ]
-        .assign(_variant=lambda d: d["hypothesis_word"].fillna("(deletion)"))
-        .assign(_region_idx=lambda d: d["dialect_region"].map(
-            lambda r: REGIONS.index(r) if r in REGIONS else len(REGIONS)
-        ))
+        dit_rows
+        .assign(
+            _variant=lambda d: d["hypothesis_word"].fillna("(deletion)"),
+            _region_idx=lambda d: d["dialect_region"].map(
+                lambda r: REGIONS.index(r) if r in REGIONS else len(REGIONS)
+            ),
+        )
+        .drop_duplicates(["path", "_variant"])
+        [["path", "hypothesis_word", "_variant", "_region_idx",
+          "dialect_region", "gender", "age",
+          "reference", "dat_hypothesis", "dit_hypothesis"]]
     )
 
     dit_table = _hypothesis_table(dit_rows, word, "dialect-ignorant", selected_regions, include_preterite)
@@ -265,7 +270,8 @@ def render_example_sentences(df_view: pd.DataFrame, word_rows: pd.DataFrame, wor
         if v in available_variants
     ]
 
-    st.markdown(f"**Sentences with word-level alignment**: {len(unique_paths):,} sentences "
+    n_unique_sentences = unique_paths["path"].nunique()
+    st.markdown(f"**Sentences with word-level alignment**: {n_unique_sentences:,} sentences "
                 f"across {len(variant_order)} DIT variants")
 
     # Outer paginator for variants: 10 per page.
@@ -323,8 +329,11 @@ def render_example_sentences(df_view: pd.DataFrame, word_rows: pd.DataFrame, wor
                 _render_example_sentence_expander(row, rows_by_path[row["path"]], word)
 
 
+@st.cache_data
 def _resolve_audio_path(rel_path: str) -> Path | None:
-    """Return the first existing audio file across AUDIO_ROOTS, or None if not found."""
+    """Return the first existing audio file across AUDIO_ROOTS, or None if not found.
+    Cached: AUDIO_ROOTS are static, so each path is stat-probed at most once per session.
+    """
     for root in AUDIO_ROOTS:
         candidate = root / rel_path
         if candidate.exists():
