@@ -12,7 +12,7 @@ _REPO_ROOT = _VIS_DIR.parent
 sys.path.insert(0, str(_REPO_ROOT / "scripts" / "domain"))
 sys.path.insert(0, str(_REPO_ROOT / "scripts" / "utils"))
 sys.path.insert(0, str(_VIS_DIR))
-from _data import LAMBDA, REGIONS, tfidf_matrix_pairs  # noqa: E402
+from _data import AUDIO_ROOTS, LAMBDA, REGIONS, tfidf_matrix_pairs  # noqa: E402
 from bipartite_matching import build_full_bipartite_graph, solve_matching  # noqa: E402
 from plot_helpers import plot_reduced_bipartite_graph_with_matching  # noqa: E402
 from preprocessing import clean_word  # noqa: E402
@@ -322,11 +322,27 @@ def render_example_sentences(df_view: pd.DataFrame, word_rows: pd.DataFrame, wor
                 _render_example_sentence_expander(row, rows_by_path[row["path"]], word)
 
 
+def _resolve_audio_path(rel_path: str) -> Path | None:
+    """Return the first existing audio file across AUDIO_ROOTS, or None if not found."""
+    for root in AUDIO_ROOTS:
+        candidate = root / rel_path
+        if candidate.exists():
+            return candidate
+    return None
+
+
 def _render_example_sentence_expander(row: pd.Series, sentence_rows: pd.DataFrame, word: str) -> None:
-    """One sentence expander: region + clip metadata, reference + hypotheses, alignment HTML, and an optional technical alignment graph."""
+    """One sentence expander: region + clip metadata, audio player, reference + hypotheses, alignment HTML, and an optional technical alignment graph."""
     path = row["path"]
     with st.expander(f"**{row['dialect_region']}** · {row['gender']} · {row['age']} · …{path[-12:]}"):
         st.markdown(f"**Clip ID:** `{path}`")
+
+        audio_file = _resolve_audio_path(path)
+        if audio_file is not None:
+            st.audio(str(audio_file))
+        else:
+            st.caption(f"Audio file not found locally: `{path}`")
+
         st.markdown(
             f"**Reference:** {row['reference']}  \n"
             f"**Hypothesis DIT:** {row['dit_hypothesis']}  \n"
