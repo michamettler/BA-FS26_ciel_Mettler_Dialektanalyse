@@ -197,29 +197,6 @@ def plot_reduced_bipartite_graph_with_matching(
     return fig
 
 
-def plot_similarity_distribution(data, title):
-    """Plot a histogram of similarities with a mean value indicated by a dashed line.
-    """
-    fig, ax = plt.subplots(figsize=(6, 4))
-    ax.hist(data.dropna(), bins=50, color=_COLOR_HIST_BAR, edgecolor="white", linewidth=0.4)
-    ax.set_title(title, fontsize=11)
-    ax.set_xlabel("Similarity (0 – 1)", fontsize=9)
-    ax.set_ylabel("Count", fontsize=9)
-    ax.xaxis.set_major_locator(mticker.MultipleLocator(0.2))
-    ax.set_xlim(0, 1)
-    mean_val = data.dropna().mean()
-    ax.axvline(
-        mean_val,
-        color=_COLOR_HIST_MEAN,
-        linewidth=1.2,
-        linestyle="--",
-        label=f"Mean: {mean_val:.5f}",
-    )
-    ax.legend(fontsize=8)
-    plt.tight_layout()
-    plt.show()
-
-
 def plot_grid_search_heatmaps(
         panels: list[tuple[np.ndarray, str]],
         alphas: np.ndarray,
