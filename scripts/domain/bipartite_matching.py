@@ -5,7 +5,6 @@ from word_similarity_calculator import (
     cost_for_word_pair_by_similarity,
     scale_cost_for_networkx,
 )
-from preprocessing import clean_word
 
 EPS = "ε"  # epsilon symbol, used for unmatched padding nodes
 SOURCE_NODE = "s"
@@ -35,17 +34,13 @@ def build_full_bipartite_graph(
     All edge capacities are 1 (unit flow).
 
     Args:
-        ref_words: Reference tokens. Cleaned internally via preprocessing.clean_word.
-        hyp_words: Hypothesis tokens. Cleaned internally via preprocessing.clean_word.
+        ref_words: Pre-Cleaned Reference tokens.
+        hyp_words: Pre-Cleaned Hypothesis tokens.
         calculator: WordSimilarityCalculator instance for computing similarities and costs.
 
     Returns:
         A NetworkX directed graph representing the bipartite flow network with nodes and edges as described above.
     """
-    # Clean once up-front; reused for both node attributes and the O(n_r*n_h) similarity loop.
-    ref_words = [clean_word(w) for w in ref_words]
-    hyp_words = [clean_word(w) for w in hyp_words]
-
     # --- Graph ---
     G = nx.DiGraph()
 
