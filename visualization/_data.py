@@ -8,6 +8,12 @@ import pandas as pd
 import streamlit as st
 from sklearn.feature_extraction.text import TfidfVectorizer
 
+from word_similarity_calculator import (  # noqa: E402, F401
+    WordSimilarityCalculator,
+    cost_for_word_pair_by_similarity,
+    similarity_for_word_pair_by_cost,
+)
+
 
 class TfidfResult(NamedTuple):
     """Region-document TF-IDF artifact: scores matrix + vocab lookups + region row ordering.
@@ -25,14 +31,9 @@ class TfidfResult(NamedTuple):
     word_to_idx: dict[str, int]
     region_order: list[str]
 
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "scripts" / "domain"))
-
-from word_similarity_calculator import (  # noqa: E402, F401
-    WordSimilarityCalculator,
-    cost_for_word_pair_by_similarity,
-    similarity_for_word_pair_by_cost,
-)
 
 ALIGN_DIR = PROJECT_ROOT / "experiments" / "analysis"
 DAT_PARQUET = ALIGN_DIR / "train_all_alignments_dialect-aware.parquet"
@@ -141,8 +142,8 @@ def tfidf_matrix_pairs(include_preterite: bool) -> TfidfResult:
         (df["model"] == "dialect-ignorant")
         & df["reference_word"].notna()
         & df["hypothesis_word"].notna()
-        & (df["reference_word"] != df["hypothesis_word"]) # filter out matches where ref and hyp are the same word
-    ]
+        & (df["reference_word"] != df["hypothesis_word"])  # filter out matches where ref and hyp are the same word
+        ]
     pairs = df["reference_word"] + "+" + df["hypothesis_word"]
     docs_per_region = [" ".join(pairs[df["dialect_region"] == r]) for r in REGIONS]
 
@@ -153,6 +154,6 @@ def tfidf_matrix_pairs(include_preterite: bool) -> TfidfResult:
     return TfidfResult(
         matrix=matrix,
         vocab=vec.get_feature_names_out().tolist(),
-        word_to_idx=cast(dict[str, int], dict(vec.vocabulary_)), # for column lookup from detail view (word selected)
+        word_to_idx=cast(dict[str, int], dict(vec.vocabulary_)),  # for column lookup from detail view (word selected)
         region_order=list(REGIONS),
     )
