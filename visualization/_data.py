@@ -19,9 +19,9 @@ class TfidfResult(NamedTuple):
     """Region-document TF-IDF artifact: scores matrix + vocab lookups + region row ordering.
 
     Fields:
-        matrix:       (n_regions, vocab_size) ndarray of TF-IDF scores; rows align with region_order.
-        vocab:        terms ordered by column index.
-        word_to_idx:  term → column index lookup.
+        matrix: (n_regions, vocab_size) ndarray of TF-IDF scores; rows align with region_order.
+        vocab: terms ordered by column index.
+        word_to_idx: term → column index lookup.
         region_order: region names ordered by row index.
 
     Tuple-unpackable: `matrix, vocab, word_to_idx, region_order = tfidf_matrix_pairs(...)` still works.
