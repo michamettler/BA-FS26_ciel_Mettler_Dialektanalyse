@@ -8,6 +8,9 @@ import pandas as pd
 import streamlit as st
 from sklearn.feature_extraction.text import TfidfVectorizer
 
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(PROJECT_ROOT / "scripts" / "domain"))
+
 from word_similarity_calculator import (  # noqa: E402, F401
     WordSimilarityCalculator,
     cost_for_word_pair_by_similarity,
@@ -31,9 +34,6 @@ class TfidfResult(NamedTuple):
     word_to_idx: dict[str, int]
     region_order: list[str]
 
-
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(PROJECT_ROOT / "scripts" / "domain"))
 
 ALIGN_DIR = PROJECT_ROOT / "experiments" / "analysis"
 DAT_PARQUET = ALIGN_DIR / "train_all_alignments_dialect-aware.parquet"
