@@ -49,7 +49,10 @@ AUDIO_ROOTS = (
 REGIONS = ["Wallis", "Zürich", "Bern", "Basel", "Graubünden", "Innerschweiz", "Ostschweiz"]
 
 # Calibrated epsilon penalty: must match build_alignment_table.LAMBDA_.
+ALPHA = 0.85
 LAMBDA = 0.45
+USE_GLOBAL_LEXICAL_NORMALIZATION = False
+USE_SQUARED_POSITIONAL = True
 
 DAT_COLOR = "#4c72b0"
 DIT_COLOR = "#dd8452"

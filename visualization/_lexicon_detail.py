@@ -12,16 +12,14 @@ _REPO_ROOT = _VIS_DIR.parent
 sys.path.insert(0, str(_REPO_ROOT / "scripts" / "domain"))
 sys.path.insert(0, str(_REPO_ROOT / "scripts" / "utils"))
 sys.path.insert(0, str(_VIS_DIR))
-from _data import AUDIO_ROOTS, LAMBDA, REGIONS, tfidf_matrix_pairs  # noqa: E402
+from _data import (  # noqa: E402
+    ALPHA, AUDIO_ROOTS, LAMBDA, REGIONS, USE_GLOBAL_LEXICAL_NORMALIZATION,
+    USE_SQUARED_POSITIONAL, tfidf_matrix_pairs,
+)
 from bipartite_matching import build_full_bipartite_graph, solve_matching  # noqa: E402
 from plot_helpers import plot_reduced_bipartite_graph_with_matching  # noqa: E402
 from preprocessing import clean_word  # noqa: E402
 from word_similarity_calculator import WordSimilarityCalculator  # noqa: E402
-
-# fixed params: must match build_alignment_table.py & are based on grid search bipartite-matching-hyperparameters.ipynb.
-_ALPHA = 0.85
-_USE_GLOBAL_LEXICAL_NORMALIZATION = False
-_USE_SQUARED_POSITIONAL = True
 
 _HYPOTHESIS_TABLE_COLUMN_CONFIG = {
     "hypothesis_word": st.column_config.TextColumn(
@@ -69,9 +67,9 @@ def _reduced_graph_figure(reference: str, hypothesis: str):
         return None
     calc = WordSimilarityCalculator(
         sent_len=max(len(ref_words), len(hyp_words)),
-        alpha=_ALPHA, lambda_=LAMBDA,
-        use_global_lexical_normalization=_USE_GLOBAL_LEXICAL_NORMALIZATION,
-        use_squared_positional=_USE_SQUARED_POSITIONAL,
+        alpha=ALPHA, lambda_=LAMBDA,
+        use_global_lexical_normalization=USE_GLOBAL_LEXICAL_NORMALIZATION,
+        use_squared_positional=USE_SQUARED_POSITIONAL,
     )
     G = build_full_bipartite_graph(ref_words, hyp_words, calc)
     matching = solve_matching(G)
