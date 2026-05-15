@@ -10,12 +10,6 @@ _TABLE_COLUMNS = ["pair", "TF-IDF", "peak region", "count"]
 _TOP_N = 200
 
 
-def _decode_pair(p: str) -> str:
-    """'ref+hyp' (internal) → 'ref → hyp' (display)."""
-    ref, hyp = p.split("+", 1)
-    return f"{ref} → {hyp}"
-
-
 def render_caption() -> None:
     """Section header and explanatory text above the word cloud."""
     st.markdown("### Word Cloud for Dialect Specific Candidates")
@@ -115,22 +109,6 @@ def render_word_cloud(table: pd.DataFrame) -> None:
     _render_region_legend(table)
 
 
-def _render_region_legend(table: pd.DataFrame) -> None:
-    """Inline color legend below the cloud, listing only regions that appear as peaks."""
-    peaks_in_view = [r for r in REGION_COLORS if (table["peak region"] == r).any()]
-    if not peaks_in_view:
-        return
-    swatches = " &nbsp; ".join(
-        f'<span style="display:inline-block;width:12px;height:12px;background:{REGION_COLORS[r]};'
-        f'margin-right:4px;vertical-align:middle;border-radius:2px;"></span>{r}'
-        for r in peaks_in_view
-    )
-    st.markdown(
-        f'<div style="text-align:center;font-size:0.9em;color:#333;">{swatches}</div>',
-        unsafe_allow_html=True,
-    )
-
-
 def render_top_candidates_expander(table: pd.DataFrame) -> None:
     """Collapsible table listing the top regionally distinctive substitution pairs."""
     column_config = {
@@ -157,3 +135,25 @@ def render_top_candidates_expander(table: pd.DataFrame) -> None:
         )
         st.dataframe(table, use_container_width=True, hide_index=True, column_config=column_config)
         st.caption("Default ordering: descending by **TF-IDF**.")
+
+
+def _decode_pair(p: str) -> str:
+    """'ref+hyp' (internal) → 'ref → hyp' (display)."""
+    ref, hyp = p.split("+", 1)
+    return f"{ref} → {hyp}"
+
+
+def _render_region_legend(table: pd.DataFrame) -> None:
+    """Inline color legend below the cloud, listing only regions that appear as peaks."""
+    peaks_in_view = [r for r in REGION_COLORS if (table["peak region"] == r).any()]
+    if not peaks_in_view:
+        return
+    swatches = " &nbsp; ".join(
+        f'<span style="display:inline-block;width:12px;height:12px;background:{REGION_COLORS[r]};'
+        f'margin-right:4px;vertical-align:middle;border-radius:2px;"></span>{r}'
+        for r in peaks_in_view
+    )
+    st.markdown(
+        f'<div style="text-align:center;font-size:0.9em;color:#333;">{swatches}</div>',
+        unsafe_allow_html=True,
+    )
