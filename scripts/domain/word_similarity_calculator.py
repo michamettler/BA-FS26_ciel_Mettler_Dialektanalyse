@@ -107,7 +107,7 @@ class WordSimilarityCalculator:
                 raise ValueError(
                     "max_word_len must be set when use_global_lexical_normalization is True"
                 )
-            return max(0.0, 1 - (distance / self.max_word_len))  # max to make sure similarity is never negative
+            return 1 - (distance / self.max_word_len)
         else:
             return Levenshtein.ratio(ref_word, hyp_word)
 

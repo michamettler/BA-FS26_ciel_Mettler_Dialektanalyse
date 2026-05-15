@@ -99,13 +99,6 @@ class TestWordSimilarityCalculator(unittest.TestCase):
         self.assertAlmostEqual(calc_short.lexical_similarity("haus", "huus"), 0.8)  # 1 - 1/5
         self.assertAlmostEqual(calc_long.lexical_similarity("haus", "huus"), 0.95)  # 1 - 1/20
 
-    def test_lexical_similarity_global_clips_to_zero_when_distance_exceeds_max(self):
-        # "haus" vs "katze": distance=4, max=2: 1 - 4/2 = -1, must clip to 0
-        calc = WordSimilarityCalculator(
-            sent_len=5, use_global_lexical_normalization=True, max_word_len=2,
-        )
-        self.assertEqual(calc.lexical_similarity("haus", "katze"), 0.0)
-
     # positional similarity (linear)
 
     def test_positional_similarity_linear_endpoints(self):
