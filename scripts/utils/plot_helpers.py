@@ -1,7 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
-import matplotlib.ticker as mticker
 import seaborn as sns
 import networkx as nx
 from bipartite_matching import (
@@ -42,9 +41,6 @@ _COLOR_SCORE_LABEL = "#555"
 
 _COLOR_EDGE_GRAY = "#ccc"
 _COLOR_EDGE_BIPARTITE = "#b0c4de"
-
-_COLOR_HIST_BAR = "#4C72B0"
-_COLOR_HIST_MEAN = "#DD5544"
 
 
 # --- Plotting Functions ---
