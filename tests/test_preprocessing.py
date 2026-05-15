@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(PROJECT_ROOT / "scripts" / "utils"))
+sys.path.insert(0, str(PROJECT_ROOT / "scripts" / "domain"))
 
 from preprocessing import clean_word
 

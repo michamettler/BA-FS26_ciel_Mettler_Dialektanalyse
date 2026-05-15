@@ -24,7 +24,7 @@ from rich.console import Console
 from rich.table import Table
 from rich.text import Text
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+PROJECT_ROOT = next(p for p in Path(__file__).resolve().parents if (p / "requirements.txt").exists())
 sys.path.insert(0, str(PROJECT_ROOT / "scripts" / "domain"))
 sys.path.insert(0, str(PROJECT_ROOT / "scripts" / "utils"))
 

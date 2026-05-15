@@ -41,7 +41,7 @@ OUTPUT_DIR = PROJECT_ROOT / "experiments" / "analysis"
 DAT_OUT = OUTPUT_DIR / "train_all_alignments_dialect-aware.parquet"
 DIT_OUT = OUTPUT_DIR / "train_all_alignments_dialect-ignorant.parquet"
 
-# Fixed Hyperparameters, based on analysis in scripts/bipartite-matching-hyperparameters.ipynb, param-selection cell.
+# Fixed Hyperparameters, based on analysis in experiments/hyperparameter_tuning/bipartite-matching-hyperparameters.ipynb, param-selection cell.
 ALPHA = 0.85
 LAMBDA_ = 0.45
 USE_GLOBAL_LEXICAL_NORM = False
