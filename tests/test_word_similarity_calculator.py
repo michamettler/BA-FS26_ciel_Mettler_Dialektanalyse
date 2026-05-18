@@ -61,7 +61,7 @@ class TestWordSimilarityCalculator(unittest.TestCase):
         self.assertAlmostEqual(calc.lexical_similarity("haus", "huus"), 0.75)
         self.assertAlmostEqual(calc.lexical_similarity("hallo", "hello"), 0.80)
 
-    def test_lexical_similarity_(self):
+    def test_lexical_similarity_prefers_morphological_match_over_unrelated_word(self):
         calc = WordSimilarityCalculator(sent_len=5)
         self.assertGreater(calc.lexical_similarity("zog", "gezogen"),
                             calc.lexical_similarity("zog", "hat"))
