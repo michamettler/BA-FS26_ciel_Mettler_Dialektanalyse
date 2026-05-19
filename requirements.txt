@@ -18,3 +18,4 @@ streamlit
 streamlit-echarts
 text2num
 scikit-learn
+jiwer
