@@ -1,7 +1,7 @@
 """Shared data layer for the Streamlit visualization pages."""
 import sys
 from pathlib import Path
-from typing import NamedTuple, cast
+from typing import Literal, NamedTuple, cast
 
 import numpy as np
 import pandas as pd
@@ -38,6 +38,9 @@ class TfidfResult(NamedTuple):
 ALIGN_DIR = PROJECT_ROOT / "experiments" / "analysis"
 DAT_PARQUET = ALIGN_DIR / "train_all_alignments_dialect-aware.parquet"
 DIT_PARQUET = ALIGN_DIR / "train_all_alignments_dialect-ignorant.parquet"
+DAT_DIT_PARQUET = ALIGN_DIR / "train_all_alignments_dat-dit.parquet"
+
+CloudMode = Literal["ref_dit", "dat_dit"]
 DAT_TSV = PROJECT_ROOT / "transcripts" / "dialect-aware" / "fhnw" / "stt4sg" / "train_all_transcribed.tsv"
 DIT_TSV = PROJECT_ROOT / "transcripts" / "dialect-ignorant" / "whisper-large-v2" / "stt4sg" / "train_all_enriched_transcribed_praet.tsv"
 BALANCED_TSV = PROJECT_ROOT / "datasets" / "STT4SG-350 v2.1" / "train_balanced.tsv"
@@ -67,6 +70,11 @@ REGION_COLORS = {
     "Ostschweiz": "#a65628",
 }
 
+MODE_TO_MODEL: dict[CloudMode, str] = {
+    "ref_dit": "dialect-ignorant",
+    "dat_dit": "dat-dit",
+}
+
 
 def epsilon_cost() -> float:
     """Cost the bipartite solver charges for routing an unmatched word through an ε edge (= λ).
@@ -87,11 +95,15 @@ def deletion_similarity() -> float:
 
 
 @st.cache_data
-def load_alignments() -> pd.DataFrame:
-    """Concat both alignment parquets and tag each row with its model."""
+def load_alignments(include_dat_dit: bool = False) -> pd.DataFrame:
+    """Concat the REF-anchored alignment parquets; opt-in to also include DAT-DIT."""
     dat = pd.read_parquet(DAT_PARQUET).assign(model="dialect-aware")
     dit = pd.read_parquet(DIT_PARQUET).assign(model="dialect-ignorant")
-    return pd.concat([dat, dit], ignore_index=True)
+    frames = [dat, dit]
+    if include_dat_dit:
+        dat_dit = pd.read_parquet(DAT_DIT_PARQUET).assign(model="dat-dit")
+        frames.append(dat_dit)
+    return pd.concat(frames, ignore_index=True)
 
 
 @st.cache_data
@@ -110,9 +122,9 @@ def load_metadata() -> pd.DataFrame:
 
 
 @st.cache_data
-def joined_view(regions: tuple[str, ...]) -> pd.DataFrame:
+def joined_view(regions: tuple[str, ...], include_dat_dit: bool = False) -> pd.DataFrame:
     """Alignments & metadata, filtered to the selected regions."""
-    alignments = load_alignments()
+    alignments = load_alignments(include_dat_dit)
     metadata = load_metadata()
     df = alignments.merge(metadata, on="path", how="left")
     return df[df["dialect_region"].isin(regions)].reset_index(drop=True)
@@ -127,22 +139,19 @@ def load_balanced_paths() -> pd.DataFrame:
 
 
 @st.cache_data
-def tfidf_matrix_pairs(include_preterite: bool) -> TfidfResult:
-    """TF-IDF over (ref, DIT-hyp) pairs across the 7 dialect regions.
-    Each ref, hyp pair is one term (encoded as ref+hyp for the vectorizer);
-    a region = document (bag of its pairs).
-    Resulting matrix shape: (7 regions × pairs vocab).
+def tfidf_matrix_pairs(include_preterite: bool, mode: CloudMode = "ref_dit") -> TfidfResult:
+    """TF-IDF over alignment pairs across the 7 dialect regions.
 
     Vectorizer config:
         * `sublinear_tf=True`: `1 + log(count)` so hapaxes don't dominate.
         * `smooth_idf=False`: no IDF +1 smoothing; universal-term contribution stays minimal.
         * L2 row-norm (sklearn default) — cross-region comparability.
     """
-    df = joined_view(tuple(REGIONS))
+    df = joined_view(tuple(REGIONS), include_dat_dit=(mode == "dat_dit"))
     if not include_preterite:
         df = df[~df["is_praeteritum"].fillna(False).astype(bool)]
     df = df[
-        (df["model"] == "dialect-ignorant")
+        (df["model"] == MODE_TO_MODEL[mode])
         & df["reference_word"].notna()
         & df["hypothesis_word"].notna()
         & (df["reference_word"] != df["hypothesis_word"])  # filter out matches where ref and hyp are the same word

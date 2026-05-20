@@ -311,9 +311,11 @@ def _alignment_columns(rows: pd.DataFrame) -> list[dict]:
     return columns
 
 
-def _render_alignment_html(columns: list[dict], hyp_label: str, searched_word: str | None = None) -> str:
+def _render_alignment_html(columns: list[dict], hyp_label: str,
+                           searched_word: str | None = None,
+                           ref_label: str = "Reference") -> str:
     """Build a 2-row HTML alignment table; highlights the column whose ref word == searched_word."""
-    ref_cells = [f'<td style="{_LABEL_STYLE}">Reference</td>']
+    ref_cells = [f'<td style="{_LABEL_STYLE}">{html.escape(ref_label)}</td>']
     hyp_cells = [f'<td style="{_LABEL_STYLE}">{html.escape(hyp_label)}</td>']
     for col in columns:
         is_searched = searched_word is not None and col["ref"] == searched_word
@@ -358,17 +360,25 @@ def _render_example_sentence_expander(row: pd.Series, sentence_rows: pd.DataFram
         )
         dat_cols = _alignment_columns(sentence_rows[sentence_rows["model"] == "dialect-aware"])
         dit_cols = _alignment_columns(sentence_rows[sentence_rows["model"] == "dialect-ignorant"])
+        dat_dit_cols = _alignment_columns(sentence_rows[sentence_rows["model"] == "dat-dit"])
         st.markdown(_render_alignment_html(dit_cols, "Hypothesis DIT", searched_word=word),
                     unsafe_allow_html=True)
         st.markdown(_render_alignment_html(dat_cols, "Hypothesis DAT", searched_word=word),
+                    unsafe_allow_html=True)
+        st.markdown(_render_alignment_html(dat_dit_cols, "Hypothesis DIT",
+                                           searched_word=None, ref_label="Hypothesis DAT"),
                     unsafe_allow_html=True)
 
         if st.checkbox("Show technical alignment", key=f"graph_{path}"):
             fig_dit = _reduced_graph_figure(row["reference"], row["dit_hypothesis"])
             if fig_dit is not None:
-                st.markdown("**DIT: reduced bipartite matching**")
+                st.markdown("**REF → DIT: reduced bipartite matching**")
                 st.pyplot(fig_dit)
             fig_dat = _reduced_graph_figure(row["reference"], row["dat_hypothesis"])
             if fig_dat is not None:
-                st.markdown("**DAT: reduced bipartite matching**")
+                st.markdown("**REF → DAT: reduced bipartite matching**")
                 st.pyplot(fig_dat)
+            fig_dat_dit = _reduced_graph_figure(row["dat_hypothesis"], row["dit_hypothesis"])
+            if fig_dat_dit is not None:
+                st.markdown("**DAT → DIT: reduced bipartite matching**")
+                st.pyplot(fig_dat_dit)

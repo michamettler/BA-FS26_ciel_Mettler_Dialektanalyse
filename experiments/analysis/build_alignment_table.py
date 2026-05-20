@@ -2,9 +2,7 @@
 Build word-alignment parquets for STT4SG-350 train_all.
 
 Aligns each sentence's reference (canonical Hochdeutsch) against both ASR outputs
-using the calibrated bipartite solver and writes one parquet per model.
-Per-sentence metadata (region, speaker, etc.) lives in the source transcript TSVs
-and is joined back at analysis time on `path`.
+and DAT against DIT using the calibrated bipartite solver.
 
 Run: python experiments/analysis/build_alignment_table.py
 """
@@ -40,6 +38,7 @@ DIT_TSV = PROJECT_ROOT / "transcripts" / "dialect-ignorant" / "whisper-large-v2"
 OUTPUT_DIR = PROJECT_ROOT / "experiments" / "analysis"
 DAT_OUT = OUTPUT_DIR / "train_all_alignments_dialect-aware.parquet"
 DIT_OUT = OUTPUT_DIR / "train_all_alignments_dialect-ignorant.parquet"
+DAT_DIT_OUT = OUTPUT_DIR / "train_all_alignments_dat-dit.parquet"
 
 # Fixed Hyperparameters, based on analysis in experiments/hyperparameter_tuning/bipartite-matching-hyperparameters.ipynb, param-selection cell.
 ALPHA = 0.85
@@ -142,10 +141,10 @@ def write_alignments(alignments: list[dict], out_path: Path) -> None:
 
 
 def align_and_write(
-        df: pd.DataFrame, hyp_col: str, out_path: Path, label: str, n_workers: int,
+        df: pd.DataFrame, ref_col: str, hyp_col: str, out_path: Path, label: str, n_workers: int,
 ) -> None:
-    """Align reference vs. one model's hypothesis and write the resulting parquet."""
-    tasks = list(zip(df["path"], df["sentence"], df[hyp_col]))
+    """Align one column's tokens against another and write the resulting parquet."""
+    tasks = list(zip(df["path"], df[ref_col], df[hyp_col]))
     alignments = run_alignments_in_parallel(tasks, n_workers)
     write_alignments(alignments, out_path)
     size_mb = out_path.stat().st_size / 1e6
@@ -164,8 +163,9 @@ def main() -> None:
     df = load_and_filter()
     print(f"Filtered to {len(df):,} sentence pairs")
 
-    align_and_write(df, DAT_HYP_COL, DAT_OUT, "dialect-aware", n_workers)
-    align_and_write(df, DIT_HYP_COL, DIT_OUT, "dialect-ignorant", n_workers)
+    align_and_write(df, "sentence", DAT_HYP_COL, DAT_OUT, "dialect-aware", n_workers)
+    align_and_write(df, "sentence", DIT_HYP_COL, DIT_OUT, "dialect-ignorant", n_workers)
+    align_and_write(df, DAT_HYP_COL, DIT_HYP_COL, DAT_DIT_OUT, "dat-dit", n_workers)
 
     runtime = time.perf_counter() - t0
     print(f"[{_now()}] done in {runtime:.1f}s on {n_workers} workers")
