@@ -51,12 +51,14 @@ with st.spinner("Loading alignment data..."):
 if not include_preterite:
     df = df[~df["is_praeteritum"].fillna(False).astype(bool)]
 
-st.sidebar.metric("Alignments", f"{len(df):,}")
+ref_only = df[df["model"] != "dat-dit"]
+
+st.sidebar.metric("Alignments", f"{len(ref_only):,}")
 st.sidebar.metric("Unique sentences", f"{df['path'].nunique():,}")
 
 # Reference-word frequencies (substitution + deletion edges only: drop insertions where ref_word is NA (epsilon))
 ref_counts = (
-    df[df["reference_word"].notna()]
+    ref_only[ref_only["reference_word"].notna()]
     .groupby("reference_word")
     .size()
     .sort_values(ascending=False)

@@ -4,7 +4,7 @@ import pandas as pd
 import streamlit as st
 from streamlit_echarts import JsCode, st_echarts
 
-from _data import REGION_COLORS, CloudMode, tfidf_matrix_pairs
+from _data import MODE_TO_MODEL, REGION_COLORS, CloudMode, tfidf_matrix_pairs
 
 _TABLE_COLUMNS = ["pair", "TF-IDF", "peak region", "count"]
 _TOP_N = 200
@@ -12,10 +12,6 @@ _TOP_N = 200
 _MODE_PAIR_LABEL: dict[CloudMode, str] = {
     "ref_dit": "(ref, DIT-hyp)",
     "dat_dit": "(DAT-hyp, DIT-hyp)",
-}
-_MODE_MODEL_TAG: dict[CloudMode, str] = {
-    "ref_dit": "dialect-ignorant",
-    "dat_dit": "dat-dit",
 }
 
 
@@ -48,7 +44,7 @@ def compute_top_table(df_view: pd.DataFrame, selected_regions: list[str], includ
     selected_region_names = [region_order[i] for i in selected_idx]
 
     counts_by_pair_region = (
-        df_view[df_view["model"] == _MODE_MODEL_TAG[mode]]
+        df_view[df_view["model"] == MODE_TO_MODEL[mode]]
         .dropna(subset=["hypothesis_word", "reference_word"])
         .pipe(lambda d: d[
             d["reference_word"] != d["hypothesis_word"]])  # filter out matches where ref and hyp are the same word

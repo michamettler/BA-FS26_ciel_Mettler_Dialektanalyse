@@ -70,6 +70,11 @@ REGION_COLORS = {
     "Ostschweiz": "#a65628",
 }
 
+MODE_TO_MODEL: dict[CloudMode, str] = {
+    "ref_dit": "dialect-ignorant",
+    "dat_dit": "dat-dit",
+}
+
 
 def epsilon_cost() -> float:
     """Cost the bipartite solver charges for routing an unmatched word through an ε edge (= λ).
@@ -130,12 +135,6 @@ def load_balanced_paths() -> pd.DataFrame:
     return balanced_data.merge(is_praet, on="path", how="left")
 
 
-_MODE_TO_MODEL: dict[CloudMode, str] = {
-    "ref_dit": "dialect-ignorant",
-    "dat_dit": "dat-dit",
-}
-
-
 @st.cache_data
 def tfidf_matrix_pairs(include_preterite: bool, mode: CloudMode = "ref_dit") -> TfidfResult:
     """TF-IDF over alignment pairs across the 7 dialect regions.
@@ -149,7 +148,7 @@ def tfidf_matrix_pairs(include_preterite: bool, mode: CloudMode = "ref_dit") -> 
     if not include_preterite:
         df = df[~df["is_praeteritum"].fillna(False).astype(bool)]
     df = df[
-        (df["model"] == _MODE_TO_MODEL[mode])
+        (df["model"] == MODE_TO_MODEL[mode])
         & df["reference_word"].notna()
         & df["hypothesis_word"].notna()
         & (df["reference_word"] != df["hypothesis_word"])  # filter out matches where ref and hyp are the same word
