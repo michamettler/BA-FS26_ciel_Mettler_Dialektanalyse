@@ -52,8 +52,10 @@ if not include_preterite:
     df = df[~df["is_praeteritum"].fillna(False).astype(bool)]
 
 ref_only = df[df["model"] != "dat-dit"]
+dat_dit_only = df[df["model"] == "dat-dit"]
 
-st.sidebar.metric("Alignments", f"{len(ref_only):,}")
+st.sidebar.metric("REF alignments", f"{len(ref_only):,}")
+st.sidebar.metric("DAT→DIT alignments", f"{len(dat_dit_only):,}")
 st.sidebar.metric("Unique sentences", f"{df['path'].nunique():,}")
 
 # Reference-word frequencies (substitution + deletion edges only: drop insertions where ref_word is NA (epsilon))
