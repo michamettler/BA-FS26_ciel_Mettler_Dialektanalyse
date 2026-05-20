@@ -95,12 +95,15 @@ def deletion_similarity() -> float:
 
 
 @st.cache_data
-def load_alignments() -> pd.DataFrame:
-    """Concat all three alignment parquets and tag each row with its alignment direction."""
+def load_alignments(include_dat_dit: bool = False) -> pd.DataFrame:
+    """Concat the REF-anchored alignment parquets; opt-in to also include DAT-DIT."""
     dat = pd.read_parquet(DAT_PARQUET).assign(model="dialect-aware")
     dit = pd.read_parquet(DIT_PARQUET).assign(model="dialect-ignorant")
-    dat_dit = pd.read_parquet(DAT_DIT_PARQUET).assign(model="dat-dit")
-    return pd.concat([dat, dit, dat_dit], ignore_index=True)
+    frames = [dat, dit]
+    if include_dat_dit:
+        dat_dit = pd.read_parquet(DAT_DIT_PARQUET).assign(model="dat-dit")
+        frames.append(dat_dit)
+    return pd.concat(frames, ignore_index=True)
 
 
 @st.cache_data
@@ -119,9 +122,9 @@ def load_metadata() -> pd.DataFrame:
 
 
 @st.cache_data
-def joined_view(regions: tuple[str, ...]) -> pd.DataFrame:
+def joined_view(regions: tuple[str, ...], include_dat_dit: bool = False) -> pd.DataFrame:
     """Alignments & metadata, filtered to the selected regions."""
-    alignments = load_alignments()
+    alignments = load_alignments(include_dat_dit)
     metadata = load_metadata()
     df = alignments.merge(metadata, on="path", how="left")
     return df[df["dialect_region"].isin(regions)].reset_index(drop=True)
@@ -144,7 +147,7 @@ def tfidf_matrix_pairs(include_preterite: bool, mode: CloudMode = "ref_dit") -> 
         * `smooth_idf=False`: no IDF +1 smoothing; universal-term contribution stays minimal.
         * L2 row-norm (sklearn default) — cross-region comparability.
     """
-    df = joined_view(tuple(REGIONS))
+    df = joined_view(tuple(REGIONS), include_dat_dit=(mode == "dat_dit"))
     if not include_preterite:
         df = df[~df["is_praeteritum"].fillna(False).astype(bool)]
     df = df[
