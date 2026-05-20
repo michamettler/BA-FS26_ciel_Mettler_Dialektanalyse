@@ -2,10 +2,7 @@
 Build word-alignment parquets for STT4SG-350 train_all.
 
 Aligns each sentence's reference (canonical Hochdeutsch) against both ASR outputs
-and additionally aligns DAT (FHNW) against DIT (Whisper) directly, all using the
-calibrated bipartite solver. Writes three parquets: REF↔DAT, REF↔DIT, DAT↔DIT.
-Per-sentence metadata (region, speaker, etc.) lives in the source transcript TSVs
-and is joined back at analysis time on `path`.
+and DAT against DIT using the calibrated bipartite solver.
 
 Run: python experiments/analysis/build_alignment_table.py
 """

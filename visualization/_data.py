@@ -140,13 +140,6 @@ _MODE_TO_MODEL: dict[CloudMode, str] = {
 def tfidf_matrix_pairs(include_preterite: bool, mode: CloudMode = "ref_dit") -> TfidfResult:
     """TF-IDF over alignment pairs across the 7 dialect regions.
 
-    Each (left, right) pair is one term (encoded as `left+right` for the vectorizer);
-    a region = document (bag of its pairs). Matrix shape: (7 regions × pairs vocab).
-
-    mode:
-        * "ref_dit" — (ref, DIT-hyp) pairs from the dialect-ignorant alignment
-        * "dat_dit" — (DAT-hyp, DIT-hyp) pairs from the DAT↔DIT alignment
-
     Vectorizer config:
         * `sublinear_tf=True`: `1 + log(count)` so hapaxes don't dominate.
         * `smooth_idf=False`: no IDF +1 smoothing; universal-term contribution stays minimal.
