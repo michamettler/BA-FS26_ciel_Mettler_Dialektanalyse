@@ -46,7 +46,7 @@ include_preterite = st.sidebar.toggle(
          "can introduce noise in the transcripts. Exclude them to focus on dialect specifics; include for more data.")
 
 with st.spinner("Loading alignment data..."):
-    df = joined_view(tuple(selected_regions))
+    df = joined_view(tuple(selected_regions), include_dat_dit=True)
 
 if not include_preterite:
     df = df[~df["is_praeteritum"].fillna(False).astype(bool)]
