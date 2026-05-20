@@ -4,25 +4,35 @@ import pandas as pd
 import streamlit as st
 from streamlit_echarts import JsCode, st_echarts
 
-from _data import REGION_COLORS, tfidf_matrix_pairs
+from _data import REGION_COLORS, CloudMode, tfidf_matrix_pairs
 
 _TABLE_COLUMNS = ["pair", "TF-IDF", "peak region", "count"]
 _TOP_N = 200
 
+_MODE_PAIR_LABEL: dict[CloudMode, str] = {
+    "ref_dit": "(ref, DIT-hyp)",
+    "dat_dit": "(DAT-hyp, DIT-hyp)",
+}
+_MODE_MODEL_TAG: dict[CloudMode, str] = {
+    "ref_dit": "dialect-ignorant",
+    "dat_dit": "dat-dit",
+}
 
-def render_caption() -> None:
+
+def render_caption(mode: CloudMode = "ref_dit") -> None:
     """Section header and explanatory text above the word cloud."""
+    pair_label = _MODE_PAIR_LABEL[mode]
     st.markdown("### Word Cloud for Dialect Specific Candidates")
     st.markdown(
-        "(ref, DIT-hyp) pairs ranked by their **TF-IDF** score across the selected regions (treated as documents). "
+        f"{pair_label} pairs ranked by their **TF-IDF** score across the selected regions (treated as documents). "
         "Surfaces pairs most distinct to their specific region. Hover a pair to see its score, peak region, and count."
     )
 
 
-def compute_top_table(df_view: pd.DataFrame, selected_regions: list[str], include_preterite: bool
-                      ) -> pd.DataFrame:
-    """Top-N (ref, DIT-hyp)-pairs ranked by max TF-IDF across the selected regions."""
-    matrix, vocab, _word_to_idx, region_order = tfidf_matrix_pairs(include_preterite)
+def compute_top_table(df_view: pd.DataFrame, selected_regions: list[str], include_preterite: bool,
+                      mode: CloudMode = "ref_dit") -> pd.DataFrame:
+    """Top-N pairs ranked by max TF-IDF across the selected regions, for the chosen mode."""
+    matrix, vocab, _word_to_idx, region_order = tfidf_matrix_pairs(include_preterite, mode)
     selected_idx = [i for i, r in enumerate(region_order) if r in selected_regions]
     if not selected_idx:
         return pd.DataFrame(columns=_TABLE_COLUMNS)
@@ -38,7 +48,7 @@ def compute_top_table(df_view: pd.DataFrame, selected_regions: list[str], includ
     selected_region_names = [region_order[i] for i in selected_idx]
 
     counts_by_pair_region = (
-        df_view[df_view["model"] == "dialect-ignorant"]
+        df_view[df_view["model"] == _MODE_MODEL_TAG[mode]]
         .dropna(subset=["hypothesis_word", "reference_word"])
         .pipe(lambda d: d[
             d["reference_word"] != d["hypothesis_word"]])  # filter out matches where ref and hyp are the same word
@@ -109,15 +119,19 @@ def render_word_cloud(table: pd.DataFrame) -> None:
     _render_region_legend(table)
 
 
-def render_top_candidates_expander(table: pd.DataFrame) -> None:
+def render_top_candidates_expander(table: pd.DataFrame, mode: CloudMode = "ref_dit") -> None:
     """Collapsible table listing the top regionally distinctive substitution pairs."""
+    pair_label = _MODE_PAIR_LABEL[mode]
+    pair_help = (
+        "(ref, DIT-hyp) pair: Standard German reference word -> DIT (Whisper) hypothesis."
+        if mode == "ref_dit"
+        else "(DAT-hyp, DIT-hyp) pair: DAT (FHNW) hypothesis word -> DIT (Whisper) hypothesis."
+    )
     column_config = {
-        "pair": st.column_config.TextColumn(
-            help="(ref, DIT-hyp) pair: Standard German reference word -> DIT (Whisper) hypothesis.",
-        ),
+        "pair": st.column_config.TextColumn(help=pair_help),
         "TF-IDF": st.column_config.NumberColumn(
-            help="For each pair, the highest TF-IDF across the selected regions is shown. "
-                 "Documents = all 7 dialect regions; terms = (ref, DIT-hyp) pairs. "
+            help=f"For each pair, the highest TF-IDF across the selected regions is shown. "
+                 f"Documents = all 7 dialect regions; terms = {pair_label} pairs. "
                  "Higher = pair is more distinct to its specific region.",
             format="%.5f",
         ),
@@ -130,7 +144,7 @@ def render_top_candidates_expander(table: pd.DataFrame) -> None:
     }
     with st.expander("Top Dialect Specific Candidates"):
         st.caption(
-            "(ref, DIT-hyp) pairs ranked by TF-IDF (max across selected regions). "
+            f"{pair_label} pairs ranked by TF-IDF (max across selected regions). "
             "Surfaces pairs most distinct to their specific region."
         )
         st.dataframe(table, use_container_width=True, hide_index=True, column_config=column_config)

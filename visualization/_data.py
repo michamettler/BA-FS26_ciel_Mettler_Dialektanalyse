@@ -1,7 +1,7 @@
 """Shared data layer for the Streamlit visualization pages."""
 import sys
 from pathlib import Path
-from typing import NamedTuple, cast
+from typing import Literal, NamedTuple, cast
 
 import numpy as np
 import pandas as pd
@@ -38,6 +38,9 @@ class TfidfResult(NamedTuple):
 ALIGN_DIR = PROJECT_ROOT / "experiments" / "analysis"
 DAT_PARQUET = ALIGN_DIR / "train_all_alignments_dialect-aware.parquet"
 DIT_PARQUET = ALIGN_DIR / "train_all_alignments_dialect-ignorant.parquet"
+DAT_DIT_PARQUET = ALIGN_DIR / "train_all_alignments_dat-dit.parquet"
+
+CloudMode = Literal["ref_dit", "dat_dit"]
 DAT_TSV = PROJECT_ROOT / "transcripts" / "dialect-aware" / "fhnw" / "stt4sg" / "train_all_transcribed.tsv"
 DIT_TSV = PROJECT_ROOT / "transcripts" / "dialect-ignorant" / "whisper-large-v2" / "stt4sg" / "train_all_enriched_transcribed_praet.tsv"
 BALANCED_TSV = PROJECT_ROOT / "datasets" / "STT4SG-350 v2.1" / "train_balanced.tsv"
@@ -88,10 +91,11 @@ def deletion_similarity() -> float:
 
 @st.cache_data
 def load_alignments() -> pd.DataFrame:
-    """Concat both alignment parquets and tag each row with its model."""
+    """Concat all three alignment parquets and tag each row with its alignment direction."""
     dat = pd.read_parquet(DAT_PARQUET).assign(model="dialect-aware")
     dit = pd.read_parquet(DIT_PARQUET).assign(model="dialect-ignorant")
-    return pd.concat([dat, dit], ignore_index=True)
+    dat_dit = pd.read_parquet(DAT_DIT_PARQUET).assign(model="dat-dit")
+    return pd.concat([dat, dit, dat_dit], ignore_index=True)
 
 
 @st.cache_data
@@ -126,12 +130,22 @@ def load_balanced_paths() -> pd.DataFrame:
     return balanced_data.merge(is_praet, on="path", how="left")
 
 
+_MODE_TO_MODEL: dict[CloudMode, str] = {
+    "ref_dit": "dialect-ignorant",
+    "dat_dit": "dat-dit",
+}
+
+
 @st.cache_data
-def tfidf_matrix_pairs(include_preterite: bool) -> TfidfResult:
-    """TF-IDF over (ref, DIT-hyp) pairs across the 7 dialect regions.
-    Each ref, hyp pair is one term (encoded as ref+hyp for the vectorizer);
-    a region = document (bag of its pairs).
-    Resulting matrix shape: (7 regions × pairs vocab).
+def tfidf_matrix_pairs(include_preterite: bool, mode: CloudMode = "ref_dit") -> TfidfResult:
+    """TF-IDF over alignment pairs across the 7 dialect regions.
+
+    Each (left, right) pair is one term (encoded as `left+right` for the vectorizer);
+    a region = document (bag of its pairs). Matrix shape: (7 regions × pairs vocab).
+
+    mode:
+        * "ref_dit" — (ref, DIT-hyp) pairs from the dialect-ignorant alignment
+        * "dat_dit" — (DAT-hyp, DIT-hyp) pairs from the DAT↔DIT alignment
 
     Vectorizer config:
         * `sublinear_tf=True`: `1 + log(count)` so hapaxes don't dominate.
@@ -142,7 +156,7 @@ def tfidf_matrix_pairs(include_preterite: bool) -> TfidfResult:
     if not include_preterite:
         df = df[~df["is_praeteritum"].fillna(False).astype(bool)]
     df = df[
-        (df["model"] == "dialect-ignorant")
+        (df["model"] == _MODE_TO_MODEL[mode])
         & df["reference_word"].notna()
         & df["hypothesis_word"].notna()
         & (df["reference_word"] != df["hypothesis_word"])  # filter out matches where ref and hyp are the same word
