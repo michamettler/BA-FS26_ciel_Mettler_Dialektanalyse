@@ -1,9 +1,11 @@
 """Detail view for the Dialect Word Lexicon page."""
 import html
+import io
 import sys
 from pathlib import Path
 
 import altair as alt
+import matplotlib.pyplot as plt
 import pandas as pd
 import streamlit as st
 
@@ -58,9 +60,9 @@ def _resolve_audio_path(rel_path: str) -> Path | None:
     return None
 
 
-@st.cache_resource(max_entries=64, show_spinner=True)
-def _reduced_graph_figure(reference: str, hypothesis: str):
-    """Run the bipartite solver and show the graph visualization."""
+@st.cache_data(max_entries=64, show_spinner=True)
+def _reduced_graph_png(reference: str, hypothesis: str) -> bytes | None:
+    """Run the bipartite solver and return the rendered matching as PNG bytes."""
     ref_words: list[str] = [w for w in (clean_word(t) for t in reference.split()) if w]
     hyp_words: list[str] = [w for w in (clean_word(t) for t in hypothesis.split()) if w]
     if not ref_words and not hyp_words:
@@ -73,7 +75,11 @@ def _reduced_graph_figure(reference: str, hypothesis: str):
     )
     G = build_full_bipartite_graph(ref_words, hyp_words, calc)
     matching = solve_matching(G)
-    return plot_reduced_bipartite_graph_with_matching(G, matching)
+    fig = plot_reduced_bipartite_graph_with_matching(G, matching)
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", bbox_inches="tight", dpi=110)
+    plt.close(fig)
+    return buf.getvalue()
 
 
 def render_header(word: str, word_rows: pd.DataFrame, selected_regions: list[str]) -> None:
@@ -348,10 +354,16 @@ def _render_example_sentence_expander(row: pd.Series, sentence_rows: pd.DataFram
         st.markdown(f"**Clip ID:** `{path}`")
 
         audio_file = _resolve_audio_path(path)
-        if audio_file is not None:
-            st.audio(str(audio_file))
-        else:
+        if audio_file is None:
             st.caption(f"Audio file not found locally: `{path}`")
+        else:
+            audio_key = f"audio_loaded_{path}"
+            loaded = st.session_state.get(audio_key, False)
+            if not loaded and st.button("▶ Load audio", key=f"load_{path}"):
+                st.session_state[audio_key] = True
+                loaded = True
+            if loaded:
+                st.audio(str(audio_file))
 
         st.markdown(
             f"**Reference:** {row['reference']}  \n"
@@ -370,15 +382,15 @@ def _render_example_sentence_expander(row: pd.Series, sentence_rows: pd.DataFram
                     unsafe_allow_html=True)
 
         if st.checkbox("Show technical alignment", key=f"graph_{path}"):
-            fig_dit = _reduced_graph_figure(row["reference"], row["dit_hypothesis"])
-            if fig_dit is not None:
+            png_dit = _reduced_graph_png(row["reference"], row["dit_hypothesis"])
+            if png_dit is not None:
                 st.markdown("**REF → DIT: reduced bipartite matching**")
-                st.pyplot(fig_dit)
-            fig_dat = _reduced_graph_figure(row["reference"], row["dat_hypothesis"])
-            if fig_dat is not None:
+                st.image(png_dit)
+            png_dat = _reduced_graph_png(row["reference"], row["dat_hypothesis"])
+            if png_dat is not None:
                 st.markdown("**REF → DAT: reduced bipartite matching**")
-                st.pyplot(fig_dat)
-            fig_dat_dit = _reduced_graph_figure(row["dat_hypothesis"], row["dit_hypothesis"])
-            if fig_dat_dit is not None:
+                st.image(png_dat)
+            png_dat_dit = _reduced_graph_png(row["dat_hypothesis"], row["dit_hypothesis"])
+            if png_dat_dit is not None:
                 st.markdown("**DAT → DIT: reduced bipartite matching**")
-                st.pyplot(fig_dat_dit)
+                st.image(png_dat_dit)

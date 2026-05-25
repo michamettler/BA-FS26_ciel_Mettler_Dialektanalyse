@@ -73,6 +73,11 @@ selected_word = st.selectbox(
     placeholder="Start typing a Standard German word...",
 )
 
+if st.session_state.get("_prev_selected_word") != selected_word:
+    for k in [k for k in st.session_state if k.startswith("audio_loaded_")]:
+        del st.session_state[k]
+    st.session_state["_prev_selected_word"] = selected_word
+
 
 def render_detail(df_view: pd.DataFrame, word: str, regions: list[str],
                   include_preterite: bool) -> None:
