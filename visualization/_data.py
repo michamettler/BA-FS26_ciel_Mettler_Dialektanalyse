@@ -141,11 +141,11 @@ def load_balanced_paths() -> pd.DataFrame:
 @st.cache_data
 def tfidf_matrix_pairs(include_preterite: bool, mode: CloudMode = "ref_dit") -> TfidfResult:
     """TF-IDF over alignment pairs across the 7 dialect regions.
-
+    
     Vectorizer config:
-        * `sublinear_tf=True`: `1 + log(count)` so frequent terms don't dominate.
-        * `smooth_idf=False`: no IDF +1 smoothing; terms in all regions get IDF 0.
-        * L2 row-norm (sklearn default) — cross-region comparability.
+        * `sublinear_tf=True`: to damp very frequent pairs.
+        * `smooth_idf=False`: use unsmoothed IDF; terms present in all regions get IDF 1 -> TF-IDF weight 0 after IDF shift.
+        * `norm='l2'` (sklearn default): making comparisons across regions meaningful.
     """
     df = joined_view(tuple(REGIONS), include_dat_dit=(mode == "dat_dit"))
     if not include_preterite:

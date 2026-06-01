@@ -1,7 +1,7 @@
 """
 Build word-alignment parquets for STT4SG-350 train_all.
 
-Aligns each sentence's reference (canonical Hochdeutsch) against both ASR outputs
+Aligns each sentence's reference (Standard German) against both ASR outputs
 and DAT against DIT using the calibrated bipartite solver.
 
 Run: python experiments/analysis/build_alignment_table.py
@@ -40,7 +40,9 @@ DAT_OUT = OUTPUT_DIR / "train_all_alignments_dialect-aware.parquet"
 DIT_OUT = OUTPUT_DIR / "train_all_alignments_dialect-ignorant.parquet"
 DAT_DIT_OUT = OUTPUT_DIR / "train_all_alignments_dat-dit.parquet"
 
-# Fixed Hyperparameters, based on analysis in experiments/hyperparameter_tuning/bipartite-matching-hyperparameters.ipynb, param-selection cell.
+# Fixed Hyperparameters, based on analysis in
+# experiments/hyperparameter_tuning/bipartite-matching-hyperparameters.ipynb
+
 ALPHA = 0.85
 LAMBDA_ = 0.45
 USE_GLOBAL_LEXICAL_NORM = False

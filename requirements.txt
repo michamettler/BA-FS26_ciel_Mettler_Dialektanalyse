@@ -19,3 +19,5 @@ streamlit-echarts
 text2num
 scikit-learn
 jiwer
+geopandas
+fiona

@@ -1,6 +1,6 @@
 """Extract a Zurich dialect subset from the STT4SG-350 dataset.
 
-Only creates a metadata TSV — audio files stay in the original dataset directory.
+Only creates a metadata TSV - audio files stay in the original dataset directory.
 The ``path`` column stores each clip's location relative to the project root,
 e.g. ``datasets/STT4SG-350 v2.1/clips__train_valid-001/uuid/hash.flac``.
 """

@@ -115,7 +115,7 @@ class WordSimilarityCalculator:
         """Positional similarity via the gap between word positions, normalized by sentence length.
 
         For N > 1:  sim = 1 - |i - j| / (N - 1)
-        For N = 1:  sim = 1.0 (single-word sentence — position is irrelevant)
+        For N = 1:  sim = 1.0 (single-word sentence => position is irrelevant)
 
         When use_squared_positional is True, the linear similarity is squared;
         small gaps stay close to 1, mid/large gaps are penalized more.
