@@ -23,7 +23,7 @@ def gt_alignment_to_matching(
     (node names follow the convention in bipartite_matching.py).
 
     Output is in the same format as solve_matching. None entries route through a
-    hyp epsilon node (deletion). Insertions (ref_ε → hyp word) are omitted because
+    hyp epsilon node (deletion). Insertions (ref_ε => hyp word) are omitted because
     evaluation only scores ref-side edges to avoid double-counting wrong edges.
     """
     matching = {}
