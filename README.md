@@ -65,9 +65,8 @@ re-transcription or re-alignment is required to use them:
 - **Dialect-word lexicon**: [`experiments/lexicon/`](experiments/lexicon). Top regionally distinctive
   substitution pairs for both alignment directions, ranked by TF–IDF.
 
-File naming and column structure are documented at each artifact's location.
-The full reproduction procedure (calibration => alignment => visualization) is
-described in *Appendix B* of the thesis.
+File naming and column structure are defined by the generating scripts (e.g., `experiments/analysis/build_alignment_table.py`) and by the header rows of the TSV artifacts.
+The full reproduction procedure (calibration => alignment => visualization) is described in *Appendix B* of the thesis.
 
 ---
 
