@@ -125,8 +125,6 @@ def audio_roots_for(dataset: str) -> tuple[Path, ...]:
 
 def epsilon_cost() -> float:
     """Cost the bipartite solver charges for routing an unmatched word through an ε edge (= λ).
-
-    Computed lazily so calculator/lambda changes propagate across Streamlit reruns without restart.
     """
     return WordSimilarityCalculator(sent_len=1, lambda_=LAMBDA).cost_for_epsilon_by_penalty()
 
@@ -223,8 +221,7 @@ def joined_view(regions: tuple[str, ...], dataset: str, include_dat_dit: bool = 
 def load_balanced_paths(dataset: str) -> pd.DataFrame | None:
     """train_balanced.tsv joined with the praeteritum flag (path, region, is_praeteritum).
 
-    Returns `None` when the dataset has no curated balanced subset (SDS-200) or in Combined mode;
-    callers should skip the balanced-paths filter in that case.
+    Returns `None` when the dataset has no curated balanced subset (SDS-200) or in Combined mode.
     """
     if dataset == COMBINED:
         return None

@@ -50,21 +50,14 @@ _LABEL_STYLE = (
 
 @st.cache_data
 def _resolve_audio_path(rel_path: str, dataset: str) -> Path | None:
-    """Return the first existing audio file for the row's dataset, or None if not found.
-    Falls back across `.flac`/`.mp3`/`.wav` on the same stem because SDS-200 stores `.flac`
-    paths in its TSVs while the actual files on disk are `.mp3`.
-    """
-    stem = Path(rel_path).with_suffix("")
-    candidates = [rel_path]
-    for ext in (".flac", ".mp3", ".wav"):
-        cand = f"{stem}{ext}"
-        if cand != rel_path:
-            candidates.append(cand)
+    """Return the first existing audio file for the row's dataset, or None.
+    Tries the stored path first, then the same path with the extension swapped to `.flac`/`.mp3`/`.wav`."""
+    candidates = [rel_path, *(str(Path(rel_path).with_suffix(ext)) for ext in (".flac", ".mp3", ".wav"))]
     for root in audio_roots_for(dataset):
         for cand in candidates:
-            p = root / cand
-            if p.exists():
-                return p
+            audio = root / cand
+            if audio.exists():
+                return audio
     return None
 
 
