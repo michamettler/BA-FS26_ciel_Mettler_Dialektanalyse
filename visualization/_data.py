@@ -38,8 +38,7 @@ class TfidfResult(NamedTuple):
 
 @dataclass(frozen=True)
 class DatasetConfig:
-    """Per-dataset paths and join semantics. Audio roots / extensions are dataset-specific
-    because SDS-200 stores `.flac` paths in its TSVs while actual files on disk are `.mp3`."""
+    """Per-dataset file paths, audio roots, and DAT/DIT join key."""
     name: str
     dat_parquet: Path
     dit_parquet: Path
@@ -114,13 +113,6 @@ MODE_TO_MODEL: dict[CloudMode, str] = {
     "ref_dit": "dialect-ignorant",
     "dat_dit": "dat-dit",
 }
-
-
-def audio_roots_for(dataset: str) -> tuple[Path, ...]:
-    """Audio roots for a single dataset, or the union across all datasets in Combined mode."""
-    if dataset == COMBINED:
-        return tuple(p for cfg in DATASETS.values() for p in cfg.audio_roots)
-    return DATASETS[dataset].audio_roots
 
 
 def epsilon_cost() -> float:
@@ -207,10 +199,7 @@ def load_metadata(dataset: str) -> pd.DataFrame:
 
 @st.cache_data
 def joined_view(regions: tuple[str, ...], dataset: str, include_dat_dit: bool = False) -> pd.DataFrame:
-    """Alignments & metadata for the given dataset, filtered to the selected regions.
-
-    Merges on `(path, dataset)` so Combined-mode paths from different datasets don't conflate.
-    """
+    """Alignments & metadata for the given dataset, filtered to the selected regions. Merges on `[path, dataset]`."""
     alignments = load_alignments(dataset, include_dat_dit)
     metadata = load_metadata(dataset)
     df = alignments.merge(metadata, on=["path", "dataset"], how="left")

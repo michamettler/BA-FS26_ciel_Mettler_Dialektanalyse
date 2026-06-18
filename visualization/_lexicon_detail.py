@@ -15,8 +15,8 @@ sys.path.insert(0, str(_REPO_ROOT / "scripts" / "domain"))
 sys.path.insert(0, str(_REPO_ROOT / "scripts" / "utils"))
 sys.path.insert(0, str(_VIS_DIR))
 from _data import (  # noqa: E402
-    ALPHA, LAMBDA, REGIONS, USE_GLOBAL_LEXICAL_NORMALIZATION,
-    USE_SQUARED_POSITIONAL, audio_roots_for, tfidf_matrix_pairs,
+    ALPHA, DATASETS, LAMBDA, REGIONS, USE_GLOBAL_LEXICAL_NORMALIZATION,
+    USE_SQUARED_POSITIONAL, tfidf_matrix_pairs,
 )
 from bipartite_matching import build_full_bipartite_graph, solve_matching  # noqa: E402
 from plot_helpers import plot_reduced_bipartite_graph_with_matching  # noqa: E402
@@ -51,9 +51,9 @@ _LABEL_STYLE = (
 @st.cache_data
 def _resolve_audio_path(rel_path: str, dataset: str) -> Path | None:
     """Return the first existing audio file for the row's dataset, or None.
-    Tries the stored path first, then the same path with the extension swapped to `.flac`/`.mp3`/`.wav`."""
-    candidates = [rel_path, *(str(Path(rel_path).with_suffix(ext)) for ext in (".flac", ".mp3", ".wav"))]
-    for root in audio_roots_for(dataset):
+    Tries the stored path, then `.mp3` as a fallback."""
+    candidates = [rel_path, str(Path(rel_path).with_suffix(".mp3"))]
+    for root in DATASETS[dataset].audio_roots:
         for cand in candidates:
             audio = root / cand
             if audio.exists():
@@ -351,9 +351,13 @@ def _back_to_cloud():
 
 
 def _render_example_sentence_expander(row: pd.Series, sentence_rows: pd.DataFrame, word: str) -> None:
-    """One sentence expander: region + clip metadata, audio player, reference + hypotheses, alignment HTML, and an optional technical alignment graph."""
+    """One sentence expander: region + clip metadata, audio player, reference + hypotheses, alignment HTML,
+    and an optional technical alignment graph."""
     path = row["path"]
-    with st.expander(f"**{row['dialect_region']}** · {row['gender']} · {row['age']} · …{path[-12:]}"):
+    # SDS-200 demographics are sparse; only show gender/age when present (else they render as "nan").
+    demographics = " · ".join(str(v) for v in (row["gender"], row["age"]) if pd.notna(v))
+    header = f"**{row['dialect_region']}**" + (f" · {demographics}" if demographics else "") + f" · …{path[-12:]}"
+    with st.expander(header):
         st.markdown(f"**Clip ID:** `{path}`")
 
         audio_file = _resolve_audio_path(path, row["dataset"])
