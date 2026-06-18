@@ -1,5 +1,6 @@
 """Shared data layer for the Streamlit visualization pages."""
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, NamedTuple, cast
 
@@ -35,19 +36,58 @@ class TfidfResult(NamedTuple):
     region_order: list[str]
 
 
-ALIGN_DIR = PROJECT_ROOT / "experiments" / "analysis"
-DAT_PARQUET = ALIGN_DIR / "train_all_alignments_dialect-aware.parquet"
-DIT_PARQUET = ALIGN_DIR / "train_all_alignments_dialect-ignorant.parquet"
-DAT_DIT_PARQUET = ALIGN_DIR / "train_all_alignments_dat-dit.parquet"
+@dataclass(frozen=True)
+class DatasetConfig:
+    """Per-dataset paths and join semantics. Audio roots / extensions are dataset-specific
+    because SDS-200 stores `.flac` paths in its TSVs while actual files on disk are `.mp3`."""
+    name: str
+    dat_parquet: Path
+    dit_parquet: Path
+    dat_dit_parquet: Path
+    dat_tsv: Path
+    dit_tsv: Path
+    balanced_tsv: Path | None         # None → "no balanced subset"; Regional Distance drops the filter.
+    audio_roots: tuple[Path, ...]
+    metadata_join_key: str            # join column between DAT and DIT TSVs ("path" or "clip_id")
+
 
 CloudMode = Literal["ref_dit", "dat_dit"]
-DAT_TSV = PROJECT_ROOT / "transcripts" / "dialect-aware" / "fhnw" / "stt4sg" / "train_all_transcribed.tsv"
-DIT_TSV = PROJECT_ROOT / "transcripts" / "dialect-ignorant" / "whisper-large-v2" / "stt4sg" / "train_all_enriched_transcribed_praet.tsv"
-BALANCED_TSV = PROJECT_ROOT / "datasets" / "STT4SG-350 v2.1" / "train_balanced.tsv"
-AUDIO_ROOTS = (
-    PROJECT_ROOT / "datasets" / "STT4SG-350 v2.1" / "clips__train_valid-001",
-    PROJECT_ROOT / "datasets" / "STT4SG-350 v2.1" / "clips__test",
+
+ALIGN_DIR = PROJECT_ROOT / "experiments" / "analysis"
+
+STT4SG = DatasetConfig(
+    name="STT4SG-350",
+    dat_parquet=ALIGN_DIR / "stt4sg" / "train_all_alignments_dialect-aware.parquet",
+    dit_parquet=ALIGN_DIR / "stt4sg" / "train_all_alignments_dialect-ignorant.parquet",
+    dat_dit_parquet=ALIGN_DIR / "stt4sg" / "train_all_alignments_dat-dit.parquet",
+    dat_tsv=PROJECT_ROOT / "transcripts" / "dialect-aware" / "fhnw" / "stt4sg" / "train_all_transcribed.tsv",
+    dit_tsv=PROJECT_ROOT / "transcripts" / "dialect-ignorant" / "whisper-large-v2" / "stt4sg" / "train_all_enriched_transcribed_praet.tsv",
+    balanced_tsv=PROJECT_ROOT / "datasets" / "STT4SG-350 v2.1" / "train_balanced.tsv",
+    audio_roots=(
+        PROJECT_ROOT / "datasets" / "STT4SG-350 v2.1" / "clips__train_valid-001",
+        PROJECT_ROOT / "datasets" / "STT4SG-350 v2.1" / "clips__test",
+    ),
+    metadata_join_key="path",
 )
+
+SDS200 = DatasetConfig(
+    name="SDS-200",
+    dat_parquet=ALIGN_DIR / "sds-200" / "train_all_alignments_dialect-aware.parquet",
+    dit_parquet=ALIGN_DIR / "sds-200" / "train_all_alignments_dialect-ignorant.parquet",
+    dat_dit_parquet=ALIGN_DIR / "sds-200" / "train_all_alignments_dat-dit.parquet",
+    dat_tsv=PROJECT_ROOT / "transcripts" / "dialect-aware" / "fhnw" / "sds-200" / "train_all_transcribed.tsv",
+    dit_tsv=PROJECT_ROOT / "transcripts" / "dialect-ignorant" / "whisper-large-v2" / "sds-200" / "export_20211220_enriched_transcribed_praet.tsv",
+    balanced_tsv=None,
+    audio_roots=(
+        PROJECT_ROOT / "datasets" / "SDS-200 Corpus" / "export_20211220_clips-001",
+    ),
+    metadata_join_key="clip_id",
+)
+
+DATASETS: dict[str, DatasetConfig] = {STT4SG.name: STT4SG, SDS200.name: SDS200}
+COMBINED = "Combined"
+DATASET_CHOICES: tuple[str, ...] = (STT4SG.name, SDS200.name, COMBINED)
+DEFAULT_DATASET = STT4SG.name
 
 REGIONS = ["Wallis", "Zürich", "Bern", "Basel", "Graubünden", "Innerschweiz", "Ostschweiz"]
 
@@ -76,6 +116,13 @@ MODE_TO_MODEL: dict[CloudMode, str] = {
 }
 
 
+def audio_roots_for(dataset: str) -> tuple[Path, ...]:
+    """Audio roots for a single dataset, or the union across all datasets in Combined mode."""
+    if dataset == COMBINED:
+        return tuple(p for cfg in DATASETS.values() for p in cfg.audio_roots)
+    return DATASETS[dataset].audio_roots
+
+
 def epsilon_cost() -> float:
     """Cost the bipartite solver charges for routing an unmatched word through an ε edge (= λ).
 
@@ -95,23 +142,26 @@ def deletion_similarity() -> float:
 
 
 @st.cache_data
-def load_alignments(include_dat_dit: bool = False) -> pd.DataFrame:
-    """Concat the REF-anchored alignment parquets; opt-in to also include DAT-DIT."""
-    dat = pd.read_parquet(DAT_PARQUET).assign(model="dialect-aware")
-    dit = pd.read_parquet(DIT_PARQUET).assign(model="dialect-ignorant")
+def load_alignments(dataset: str, include_dat_dit: bool = False) -> pd.DataFrame:
+    """Concat the REF-anchored alignment parquets for the given dataset; opt-in to also include DAT-DIT."""
+    if dataset == COMBINED:
+        frames = [load_alignments(name, include_dat_dit) for name in DATASETS]
+        return pd.concat(frames, ignore_index=True)
+    cfg = DATASETS[dataset]
+    dat = pd.read_parquet(cfg.dat_parquet).assign(model="dialect-aware", dataset=cfg.name)
+    dit = pd.read_parquet(cfg.dit_parquet).assign(model="dialect-ignorant", dataset=cfg.name)
     frames = [dat, dit]
     if include_dat_dit:
-        dat_dit = pd.read_parquet(DAT_DIT_PARQUET).assign(model="dat-dit")
+        dat_dit = pd.read_parquet(cfg.dat_dit_parquet).assign(model="dat-dit", dataset=cfg.name)
         frames.append(dat_dit)
     return pd.concat(frames, ignore_index=True)
 
 
-@st.cache_data
-def load_metadata() -> pd.DataFrame:
-    """Slim per-sentence frame: region/speaker metadata + reference + both hypotheses + tense flag."""
+def _load_metadata_path_joined(cfg: DatasetConfig) -> pd.DataFrame:
+    """STT4SG-shape metadata: DAT TSV joined to DIT TSV on `path`."""
     dat_cols = ["path", "dialect_region", "client_id", "gender", "age", "canton", "sentence", "fhnw_transcript"]
-    dat = pd.read_csv(DAT_TSV, sep="\t", encoding="utf-8-sig")[dat_cols]
-    dit = pd.read_csv(DIT_TSV, sep="\t", encoding="utf-8-sig")[
+    dat = pd.read_csv(cfg.dat_tsv, sep="\t", encoding="utf-8-sig")[dat_cols]
+    dit = pd.read_csv(cfg.dit_tsv, sep="\t", encoding="utf-8-sig")[
         ["path", "whisper_large_v2_transcript", "is_praeteritum"]
     ]
     return dat.merge(dit, on="path", how="left").rename(columns={
@@ -121,33 +171,81 @@ def load_metadata() -> pd.DataFrame:
     })
 
 
+def _load_metadata_clip_id_joined(cfg: DatasetConfig) -> pd.DataFrame:
+    """SDS-200-shape metadata: DAT TSV (has no `path`) joined to DIT TSV on `clip_id`; emit
+    DIT's `path` so downstream merges with the alignment parquet match (alignment stores DIT's path)."""
+    dat = pd.read_csv(cfg.dat_tsv, sep="\t", encoding="utf-8-sig")[
+        ["clip_id", "sentence", "fhnw_transcript", "client_id", "gender", "age", "canton"]
+    ]
+    dit = pd.read_csv(cfg.dit_tsv, sep="\t", encoding="utf-8-sig")[
+        ["clip_id", "path", "dialect_region", "whisper_large_v2_transcript", "is_praeteritum"]
+    ]
+    merged = dat.merge(dit, on="clip_id", how="inner").rename(columns={
+        "sentence": "reference",
+        "fhnw_transcript": "dat_hypothesis",
+        "whisper_large_v2_transcript": "dit_hypothesis",
+    })
+    return merged[[
+        "path", "dialect_region", "client_id", "gender", "age", "canton",
+        "reference", "dat_hypothesis", "dit_hypothesis", "is_praeteritum",
+    ]]
+
+
 @st.cache_data
-def joined_view(regions: tuple[str, ...], include_dat_dit: bool = False) -> pd.DataFrame:
-    """Alignments & metadata, filtered to the selected regions."""
-    alignments = load_alignments(include_dat_dit)
-    metadata = load_metadata()
-    df = alignments.merge(metadata, on="path", how="left")
+def load_metadata(dataset: str) -> pd.DataFrame:
+    """Per-sentence metadata for the given dataset. Combined concats all datasets, tagged with `dataset`."""
+    if dataset == COMBINED:
+        return pd.concat([load_metadata(name) for name in DATASETS], ignore_index=True)
+    cfg = DATASETS[dataset]
+    if cfg.metadata_join_key == "path":
+        df = _load_metadata_path_joined(cfg)
+    elif cfg.metadata_join_key == "clip_id":
+        df = _load_metadata_clip_id_joined(cfg)
+    else:
+        raise ValueError(f"Unknown metadata_join_key: {cfg.metadata_join_key}")
+    df["dataset"] = cfg.name
+    return df
+
+
+@st.cache_data
+def joined_view(regions: tuple[str, ...], dataset: str, include_dat_dit: bool = False) -> pd.DataFrame:
+    """Alignments & metadata for the given dataset, filtered to the selected regions.
+
+    Merges on `(path, dataset)` so Combined-mode paths from different datasets don't conflate.
+    """
+    alignments = load_alignments(dataset, include_dat_dit)
+    metadata = load_metadata(dataset)
+    df = alignments.merge(metadata, on=["path", "dataset"], how="left")
     return df[df["dialect_region"].isin(regions)].reset_index(drop=True)
 
 
 @st.cache_data
-def load_balanced_paths() -> pd.DataFrame:
-    """train_balanced.tsv joined with the praeteritum flag (path, region, is_praeteritum)."""
-    balanced_data = pd.read_csv(BALANCED_TSV, sep="\t", encoding="utf-8-sig")[["path", "dialect_region"]]
-    is_praet = pd.read_csv(DIT_TSV, sep="\t", encoding="utf-8-sig", usecols=["path", "is_praeteritum"])
-    return balanced_data.merge(is_praet, on="path", how="left")
+def load_balanced_paths(dataset: str) -> pd.DataFrame | None:
+    """train_balanced.tsv joined with the praeteritum flag (path, region, is_praeteritum).
+
+    Returns `None` when the dataset has no curated balanced subset (SDS-200) or in Combined mode;
+    callers should skip the balanced-paths filter in that case.
+    """
+    if dataset == COMBINED:
+        return None
+    cfg = DATASETS[dataset]
+    if cfg.balanced_tsv is None:
+        return None
+    balanced = pd.read_csv(cfg.balanced_tsv, sep="\t", encoding="utf-8-sig")[["path", "dialect_region"]]
+    is_praet = pd.read_csv(cfg.dit_tsv, sep="\t", encoding="utf-8-sig", usecols=["path", "is_praeteritum"])
+    return balanced.merge(is_praet, on="path", how="left")
 
 
 @st.cache_data
-def tfidf_matrix_pairs(include_preterite: bool, mode: CloudMode = "ref_dit") -> TfidfResult:
-    """TF-IDF over alignment pairs across the 7 dialect regions.
-    
+def tfidf_matrix_pairs(include_preterite: bool, mode: CloudMode, dataset: str) -> TfidfResult:
+    """TF-IDF over alignment pairs across the 7 dialect regions, for the given dataset.
+
     Vectorizer config:
         * `sublinear_tf=True`: to damp very frequent pairs.
         * `smooth_idf=False`: use unsmoothed IDF; terms present in all regions get IDF 1 -> TF-IDF weight 0 after IDF shift.
         * `norm='l2'` (sklearn default): making comparisons across regions meaningful.
     """
-    df = joined_view(tuple(REGIONS), include_dat_dit=(mode == "dat_dit"))
+    df = joined_view(tuple(REGIONS), dataset, include_dat_dit=(mode == "dat_dit"))
     if not include_preterite:
         df = df[~df["is_praeteritum"].fillna(False).astype(bool)]
     df = df[

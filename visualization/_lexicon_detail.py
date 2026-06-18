@@ -15,8 +15,8 @@ sys.path.insert(0, str(_REPO_ROOT / "scripts" / "domain"))
 sys.path.insert(0, str(_REPO_ROOT / "scripts" / "utils"))
 sys.path.insert(0, str(_VIS_DIR))
 from _data import (  # noqa: E402
-    ALPHA, AUDIO_ROOTS, LAMBDA, REGIONS, USE_GLOBAL_LEXICAL_NORMALIZATION,
-    USE_SQUARED_POSITIONAL, tfidf_matrix_pairs,
+    ALPHA, LAMBDA, REGIONS, USE_GLOBAL_LEXICAL_NORMALIZATION,
+    USE_SQUARED_POSITIONAL, audio_roots_for, tfidf_matrix_pairs,
 )
 from bipartite_matching import build_full_bipartite_graph, solve_matching  # noqa: E402
 from plot_helpers import plot_reduced_bipartite_graph_with_matching  # noqa: E402
@@ -49,14 +49,22 @@ _LABEL_STYLE = (
 
 
 @st.cache_data
-def _resolve_audio_path(rel_path: str) -> Path | None:
-    """Return the first existing audio file across AUDIO_ROOTS, or None if not found.
-    Cached: AUDIO_ROOTS are static, so each path is stat-probed at most once per session.
+def _resolve_audio_path(rel_path: str, dataset: str) -> Path | None:
+    """Return the first existing audio file for the row's dataset, or None if not found.
+    Falls back across `.flac`/`.mp3`/`.wav` on the same stem because SDS-200 stores `.flac`
+    paths in its TSVs while the actual files on disk are `.mp3`.
     """
-    for root in AUDIO_ROOTS:
-        candidate = root / rel_path
-        if candidate.exists():
-            return candidate
+    stem = Path(rel_path).with_suffix("")
+    candidates = [rel_path]
+    for ext in (".flac", ".mp3", ".wav"):
+        cand = f"{stem}{ext}"
+        if cand != rel_path:
+            candidates.append(cand)
+    for root in audio_roots_for(dataset):
+        for cand in candidates:
+            p = root / cand
+            if p.exists():
+                return p
     return None
 
 
@@ -93,7 +101,7 @@ def render_header(word: str, word_rows: pd.DataFrame, selected_regions: list[str
 
 
 def render_hypothesis_tables(word: str, word_rows: pd.DataFrame, selected_regions: list[str],
-                             include_preterite: bool) -> None:
+                             include_preterite: bool, dataset: str) -> None:
     """Side-by-side DIT/DAT hypothesis-variant tables for the searched reference word."""
     col_dit, col_dat = st.columns(2)
     with col_dit:
@@ -101,7 +109,7 @@ def render_hypothesis_tables(word: str, word_rows: pd.DataFrame, selected_region
         st.caption("Hypothesis variants the DIT model produced as the alignment of the searched reference word.")
         dit_table = _hypothesis_table(
             word_rows[word_rows["model"] == "dialect-ignorant"],
-            word, "dialect-ignorant", selected_regions, include_preterite,
+            word, "dialect-ignorant", selected_regions, include_preterite, dataset,
         )
         st.dataframe(dit_table, use_container_width=True, hide_index=True,
                      column_config=_HYPOTHESIS_TABLE_COLUMN_CONFIG)
@@ -111,7 +119,7 @@ def render_hypothesis_tables(word: str, word_rows: pd.DataFrame, selected_region
         st.caption("Hypothesis variants the DAT model produced as the alignment of the searched reference word.")
         dat_table = _hypothesis_table(
             word_rows[word_rows["model"] == "dialect-aware"],
-            word, "dialect-aware", selected_regions, include_preterite,
+            word, "dialect-aware", selected_regions, include_preterite, dataset,
         )
         st.dataframe(dat_table, use_container_width=True, hide_index=True,
                      column_config=_HYPOTHESIS_TABLE_COLUMN_CONFIG)
@@ -159,14 +167,16 @@ def render_word_chart(word_rows: pd.DataFrame) -> None:
 
 
 def render_example_sentences(df_view: pd.DataFrame, word_rows: pd.DataFrame, word: str,
-                             selected_regions: list[str], include_preterite: bool) -> None:
+                             selected_regions: list[str], include_preterite: bool,
+                             dataset: str) -> None:
     """Sentences grouped by DIT hypothesis (TF-IDF desc). Two-level pagination: outer pager
     selects which variants to show; each variant is a collapsible expander with its own inner
     sentence pager. Matches and deletions sort to the bottom (TF-IDF = 0).
     """
     dit_rows = word_rows[word_rows["model"] == "dialect-ignorant"]
     # Dedupe on (path, _variant) so sentences with multiple occurrences of the searched word
-    # appear under every variant they actually aligned to.
+    # appear under every variant they actually aligned to. `dataset` is included so the same
+    # path string from different datasets stays separate in Combined mode.
     unique_paths = (
         dit_rows
         .assign(
@@ -175,13 +185,13 @@ def render_example_sentences(df_view: pd.DataFrame, word_rows: pd.DataFrame, wor
                 lambda r: REGIONS.index(r) if r in REGIONS else len(REGIONS)
             ),
         )
-        .drop_duplicates(["path", "_variant"])
-        [["path", "hypothesis_word", "_variant", "_region_idx",
+        .drop_duplicates(["path", "dataset", "_variant"])
+        [["path", "dataset", "hypothesis_word", "_variant", "_region_idx",
           "dialect_region", "gender", "age",
           "reference", "dat_hypothesis", "dit_hypothesis"]]
     )
 
-    dit_table = _hypothesis_table(dit_rows, word, "dialect-ignorant", selected_regions, include_preterite)
+    dit_table = _hypothesis_table(dit_rows, word, "dialect-ignorant", selected_regions, include_preterite, dataset)
     available_variants = set(unique_paths["_variant"].unique())
     variant_order = [
         v for v in dit_table["hypothesis_word"].fillna("(deletion)").tolist()
@@ -248,7 +258,8 @@ def render_example_sentences(df_view: pd.DataFrame, word_rows: pd.DataFrame, wor
 
 
 def _hypothesis_table(slice_df: pd.DataFrame, ref_word: str, model: str,
-                      selected_regions: list[str], include_preterite: bool) -> pd.DataFrame:
+                      selected_regions: list[str], include_preterite: bool,
+                      dataset: str) -> pd.DataFrame:
     """Hypothesis variants with count, per-variant mean similarity & TF-IDF score. Sorted by TF-IDF.
     TF-IDF only for DIT-variants, not DAT-variants."""
     out = (
@@ -264,7 +275,7 @@ def _hypothesis_table(slice_df: pd.DataFrame, ref_word: str, model: str,
             .sort_values("count", ascending=False)
         )
 
-    matrix, _vocab, word_to_idx, region_order = tfidf_matrix_pairs(include_preterite)
+    matrix, _vocab, word_to_idx, region_order = tfidf_matrix_pairs(include_preterite, "ref_dit", dataset)
     selected_idx = [i for i, r in enumerate(region_order) if r in selected_regions]
 
     def lookup(hyp):
@@ -353,7 +364,7 @@ def _render_example_sentence_expander(row: pd.Series, sentence_rows: pd.DataFram
     with st.expander(f"**{row['dialect_region']}** · {row['gender']} · {row['age']} · …{path[-12:]}"):
         st.markdown(f"**Clip ID:** `{path}`")
 
-        audio_file = _resolve_audio_path(path)
+        audio_file = _resolve_audio_path(path, row["dataset"])
         if audio_file is None:
             st.caption(f"Audio file not found locally: `{path}`")
         else:

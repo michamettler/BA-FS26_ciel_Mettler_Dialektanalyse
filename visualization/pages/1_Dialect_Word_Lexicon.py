@@ -14,7 +14,10 @@ import streamlit as st
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import _lexicon_detail as detail  # noqa: E402
 import _lexicon_overview as overview  # noqa: E402
-from _data import REGION_COLORS, REGIONS, CloudMode, joined_view  # noqa: E402
+from _data import (  # noqa: E402
+    COMBINED, DATASET_CHOICES, DEFAULT_DATASET, REGION_COLORS, REGIONS,
+    CloudMode, joined_view,
+)
 
 
 # --- Page 1 ---
@@ -22,6 +25,20 @@ st.set_page_config(page_title="Dialect Word Lexicon", layout="wide")
 st.title("Dialect Word Lexicon")
 
 # Sidebar filters
+dataset = st.sidebar.selectbox(
+    "Dataset",
+    DATASET_CHOICES,
+    index=DATASET_CHOICES.index(DEFAULT_DATASET),
+    key="selected_dataset",
+    help="Switch between STT4SG-350, SDS-200, or Combined (both datasets concatenated).",
+)
+if dataset == COMBINED:
+    st.info(
+        "**Combined view** concatenates STT4SG-350 and SDS-200 and treats them as one sample. "
+        "Recording conditions differ between corpora, so patterns confirmed in both are more "
+        "robust than patterns from a single dataset."
+    )
+
 region_filter = st.sidebar.multiselect(
     "Filter regions",
     REGIONS,
@@ -46,7 +63,7 @@ include_preterite = st.sidebar.toggle(
          "can introduce noise in the transcripts. Exclude them to focus on dialect specifics; include for more data.")
 
 with st.spinner("Loading alignment data..."):
-    df = joined_view(tuple(selected_regions), include_dat_dit=True)
+    df = joined_view(tuple(selected_regions), dataset, include_dat_dit=True)
 
 if not include_preterite:
     df = df[~df["is_praeteritum"].fillna(False).astype(bool)]
@@ -80,16 +97,17 @@ if st.session_state.get("_prev_selected_word") != selected_word:
 
 
 def render_detail(df_view: pd.DataFrame, word: str, regions: list[str],
-                  include_preterite: bool) -> None:
+                  include_preterite: bool, dataset: str) -> None:
     """Per-reference-word detail view: header, hypothesis tables, charts, regional table, examples."""
     word_rows = df_view[(df_view["reference_word"] == word) & (df_view["model"] != "dat-dit")]
     detail.render_header(word, word_rows, regions)
     detail.render_word_chart(word_rows)
-    detail.render_hypothesis_tables(word, word_rows, regions, include_preterite)
-    detail.render_example_sentences(df_view, word_rows, word, regions, include_preterite)
+    detail.render_hypothesis_tables(word, word_rows, regions, include_preterite, dataset)
+    detail.render_example_sentences(df_view, word_rows, word, regions, include_preterite, dataset)
 
 
-def render_overview(df_view: pd.DataFrame, regions: list[str], include_preterite: bool) -> None:
+def render_overview(df_view: pd.DataFrame, regions: list[str], include_preterite: bool,
+                    dataset: str) -> None:
     """Word-cloud overview of regionally distinctive substitution pairs."""
     mode_label = st.radio(
         "Compare",
@@ -99,7 +117,7 @@ def render_overview(df_view: pd.DataFrame, regions: list[str], include_preterite
     )
     mode: CloudMode = "ref_dit" if mode_label.startswith("Reference") else "dat_dit"
     overview.render_caption(mode)
-    table = overview.compute_top_table(df_view, regions, include_preterite, mode)
+    table = overview.compute_top_table(df_view, regions, include_preterite, mode, dataset)
     if table.empty:
         st.warning("No regionally distinctive pairs in the selected regions.")
         return
@@ -108,6 +126,6 @@ def render_overview(df_view: pd.DataFrame, regions: list[str], include_preterite
 
 
 if selected_word:
-    render_detail(df, selected_word, selected_regions, include_preterite)
+    render_detail(df, selected_word, selected_regions, include_preterite, dataset)
 else:
-    render_overview(df, selected_regions, include_preterite)
+    render_overview(df, selected_regions, include_preterite, dataset)

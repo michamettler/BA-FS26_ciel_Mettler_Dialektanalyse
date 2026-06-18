@@ -26,9 +26,9 @@ def render_caption(mode: CloudMode = "ref_dit") -> None:
 
 
 def compute_top_table(df_view: pd.DataFrame, selected_regions: list[str], include_preterite: bool,
-                      mode: CloudMode = "ref_dit") -> pd.DataFrame:
+                      mode: CloudMode, dataset: str) -> pd.DataFrame:
     """Top-N pairs ranked by max TF-IDF across the selected regions, for the chosen mode."""
-    matrix, vocab, _word_to_idx, region_order = tfidf_matrix_pairs(include_preterite, mode)
+    matrix, vocab, _word_to_idx, region_order = tfidf_matrix_pairs(include_preterite, mode, dataset)
     selected_idx = [i for i, r in enumerate(region_order) if r in selected_regions]
     if not selected_idx:
         return pd.DataFrame(columns=_TABLE_COLUMNS)
