@@ -39,7 +39,7 @@ def per_sentence_cost(dataset: str) -> pd.DataFrame:
     align["cost"] = cost_for_word_pair_by_similarity(align["similarity"]).fillna(epsilon_cost())
 
     grouped = (
-        align.groupby(["path", "dataset", "model"], observed=True)
+        align.groupby(["path", "model"], observed=True)
         .agg(total_cost=("cost", "sum"), n_ref_words=("is_ref", "sum"))
         .reset_index()
     )
@@ -47,9 +47,9 @@ def per_sentence_cost(dataset: str) -> pd.DataFrame:
     if balanced is not None:
         grouped = grouped.merge(balanced, on="path", how="inner")
     else:
-        # No balanced TSV: pull dialect_region / is_praeteritum from metadata (per dataset).
-        metadata = load_metadata(dataset)[["path", "dataset", "dialect_region", "is_praeteritum"]]
-        grouped = grouped.merge(metadata, on=["path", "dataset"], how="inner")
+        # No balanced TSV: pull dialect_region / is_praeteritum from metadata.
+        metadata = load_metadata(dataset)[["path", "dialect_region", "is_praeteritum"]]
+        grouped = grouped.merge(metadata, on="path", how="inner")
         grouped = grouped[grouped["dialect_region"].notna()]
     grouped["total_cost_per_ref_word"] = grouped["total_cost"] / grouped["n_ref_words"]
     return grouped

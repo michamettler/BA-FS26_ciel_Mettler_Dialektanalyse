@@ -175,8 +175,7 @@ def render_example_sentences(df_view: pd.DataFrame, word_rows: pd.DataFrame, wor
     """
     dit_rows = word_rows[word_rows["model"] == "dialect-ignorant"]
     # Dedupe on (path, _variant) so sentences with multiple occurrences of the searched word
-    # appear under every variant they actually aligned to. `dataset` is included so the same
-    # path string from different datasets stays separate in Combined mode.
+    # appear under every variant they actually aligned to.
     unique_paths = (
         dit_rows
         .assign(
@@ -185,7 +184,7 @@ def render_example_sentences(df_view: pd.DataFrame, word_rows: pd.DataFrame, wor
                 lambda r: REGIONS.index(r) if r in REGIONS else len(REGIONS)
             ),
         )
-        .drop_duplicates(["path", "dataset", "_variant"])
+        .drop_duplicates(["path", "_variant"])
         [["path", "dataset", "hypothesis_word", "_variant", "_region_idx",
           "dialect_region", "gender", "age",
           "reference", "dat_hypothesis", "dit_hypothesis"]]
