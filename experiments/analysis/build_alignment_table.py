@@ -1,5 +1,5 @@
 """
-Build word-alignment parquets for STT4SG-350 train_all.
+Build word-alignment parquets for STT4SG-350 train_all and SDS-200 train_all.
 
 Aligns each sentence's reference (Standard German) against both ASR outputs
 and DAT against DIT using the calibrated bipartite solver.
@@ -33,12 +33,21 @@ from word_similarity_calculator import WordSimilarityCalculator  # noqa: E402
 from preprocessing import clean_word  # noqa: E402
 
 # Paths
+OUTPUT_DIR = PROJECT_ROOT / "experiments" / "analysis"
+
 DAT_TSV = PROJECT_ROOT / "transcripts" / "dialect-aware" / "fhnw" / "stt4sg" / "train_all_transcribed.tsv"
 DIT_TSV = PROJECT_ROOT / "transcripts" / "dialect-ignorant" / "whisper-large-v2" / "stt4sg" / "train_all_enriched_transcribed_praet.tsv"
-OUTPUT_DIR = PROJECT_ROOT / "experiments" / "analysis"
-DAT_OUT = OUTPUT_DIR / "train_all_alignments_dialect-aware.parquet"
-DIT_OUT = OUTPUT_DIR / "train_all_alignments_dialect-ignorant.parquet"
-DAT_DIT_OUT = OUTPUT_DIR / "train_all_alignments_dat-dit.parquet"
+STT4SG_OUT_DIR = OUTPUT_DIR / "stt4sg"
+DAT_OUT = STT4SG_OUT_DIR / "train_all_alignments_dialect-aware.parquet"
+DIT_OUT = STT4SG_OUT_DIR / "train_all_alignments_dialect-ignorant.parquet"
+DAT_DIT_OUT = STT4SG_OUT_DIR / "train_all_alignments_dat-dit.parquet"
+
+SDS200_DAT_TSV = PROJECT_ROOT / "transcripts" / "dialect-aware" / "fhnw" / "sds-200" / "train_all_transcribed.tsv"
+SDS200_DIT_TSV = PROJECT_ROOT / "transcripts" / "dialect-ignorant" / "whisper-large-v2" / "sds-200" / "export_20211220_enriched_transcribed_praet.tsv"
+SDS200_OUT_DIR = OUTPUT_DIR / "sds-200"
+SDS200_DAT_OUT = SDS200_OUT_DIR / "train_all_alignments_dialect-aware.parquet"
+SDS200_DIT_OUT = SDS200_OUT_DIR / "train_all_alignments_dialect-ignorant.parquet"
+SDS200_DAT_DIT_OUT = SDS200_OUT_DIR / "train_all_alignments_dat-dit.parquet"
 
 # Fixed Hyperparameters, based on analysis in
 # experiments/hyperparameter_tuning/bipartite-matching-hyperparameters.ipynb
@@ -56,7 +65,7 @@ OUTPUT_COLUMNS = ["path", "reference_word", "hypothesis_word", "reference_index"
 
 
 def load_and_filter() -> pd.DataFrame:
-    """Read DAT and DIT TSVs, inner-join on `path`, apply quality filters.
+    """Read STT4SG-350 DAT and DIT TSVs, inner-join on `path`, apply quality filters.
     Needed because annotations live in dialect-ignorant TSV."""
     dat = pd.read_csv(DAT_TSV, sep="\t", encoding="utf-8-sig")[
         ["path", "sentence", DAT_HYP_COL, "dialect_region"]
@@ -65,6 +74,23 @@ def load_and_filter() -> pd.DataFrame:
         ["path", DIT_HYP_COL, "clip_is_usable", "drop_reason"]
     ]
     df = dat.merge(dit, on="path", how="inner", validate="one_to_one")
+
+    df = df[df["dialect_region"].notna() & (df["dialect_region"].astype(str).str.strip() != "")]
+    df = df[(df["clip_is_usable"] == True) & (df["drop_reason"].fillna("").str.strip() == "")]
+    df = df[df[DAT_HYP_COL].notna() & ~df[DAT_HYP_COL].astype(str).str.startswith("ERROR")]
+    df = df[df[DIT_HYP_COL].notna() & ~df[DIT_HYP_COL].astype(str).str.startswith("ERROR")]
+    return df.reset_index(drop=True)
+
+
+def load_and_filter_sds200() -> pd.DataFrame:
+    """Read SDS-200 DAT and DIT TSVs, inner-join on `clip_id`, apply quality filters."""
+    dat = pd.read_csv(SDS200_DAT_TSV, sep="\t", encoding="utf-8-sig")[
+        ["clip_id", "sentence", DAT_HYP_COL]
+    ]
+    dit = pd.read_csv(SDS200_DIT_TSV, sep="\t", encoding="utf-8-sig")[
+        ["clip_id", "path", DIT_HYP_COL, "dialect_region", "clip_is_usable", "drop_reason"]
+    ]
+    df = dat.merge(dit, on="clip_id", how="inner", validate="one_to_one")
 
     df = df[df["dialect_region"].notna() & (df["dialect_region"].astype(str).str.strip() != "")]
     df = df[(df["clip_is_usable"] == True) & (df["drop_reason"].fillna("").str.strip() == "")]
@@ -129,7 +155,7 @@ def _alignment_row(reference_word, hypothesis_word, reference_index, hypothesis_
 
 def write_alignments(alignments: list[dict], out_path: Path) -> None:
     """Write alignments to zstd-compressed parquet with deterministic row order."""
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
     # `columns=` ensures the schema is set even when alignments is empty (no KeyError on sort).
     df = (
         pd.DataFrame(alignments, columns=OUTPUT_COLUMNS)
@@ -158,16 +184,22 @@ def _now() -> str:
 
 
 def main() -> None:
-    print(f"[{_now()}] start building alignment tables for train_all")
     t0 = time.perf_counter()
     n_workers = os.cpu_count() or 1
 
+    print(f"[{_now()}] start building alignment tables for STT4SG-350 train_all")
     df = load_and_filter()
     print(f"Filtered to {len(df):,} sentence pairs")
-
     align_and_write(df, "sentence", DAT_HYP_COL, DAT_OUT, "dialect-aware", n_workers)
     align_and_write(df, "sentence", DIT_HYP_COL, DIT_OUT, "dialect-ignorant", n_workers)
     align_and_write(df, DAT_HYP_COL, DIT_HYP_COL, DAT_DIT_OUT, "dat-dit", n_workers)
+
+    print(f"[{_now()}] start building alignment tables for SDS-200 train_all")
+    df_sds = load_and_filter_sds200()
+    print(f"Filtered to {len(df_sds):,} sentence pairs")
+    align_and_write(df_sds, "sentence", DAT_HYP_COL, SDS200_DAT_OUT, "dialect-aware", n_workers)
+    align_and_write(df_sds, "sentence", DIT_HYP_COL, SDS200_DIT_OUT, "dialect-ignorant", n_workers)
+    align_and_write(df_sds, DAT_HYP_COL, DIT_HYP_COL, SDS200_DAT_DIT_OUT, "dat-dit", n_workers)
 
     runtime = time.perf_counter() - t0
     print(f"[{_now()}] done in {runtime:.1f}s on {n_workers} workers")

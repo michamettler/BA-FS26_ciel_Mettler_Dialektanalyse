@@ -16,7 +16,7 @@ sys.path.insert(0, str(_VIS_DIR))
 from _data import (  # noqa: E402
     DAT_COLOR, DIT_COLOR, LAMBDA,
     cost_for_word_pair_by_similarity, epsilon_cost,
-    load_alignments, load_balanced_paths,
+    load_alignments, load_balanced_paths, load_metadata,
 )
 
 _MODEL_SCALE = alt.Scale(
@@ -26,13 +26,15 @@ _MODEL_SCALE = alt.Scale(
 
 
 @st.cache_data
-def per_sentence_cost() -> pd.DataFrame:
-    """Per-sentence alignment cost for both models, restricted to train_balanced paths."""
-    balanced = load_balanced_paths()
-    balanced_paths = set(balanced["path"])
-
-    align = load_alignments()
-    align = align[align["path"].isin(balanced_paths)].copy()
+def per_sentence_cost(dataset: str) -> pd.DataFrame:
+    """Per-sentence alignment cost for both models."""
+    balanced = load_balanced_paths(dataset)
+    align = load_alignments(dataset)
+    if balanced is not None:
+        balanced_paths = set(balanced["path"])
+        align = align[align["path"].isin(balanced_paths)].copy()
+    else:
+        align = align.copy()
     align["is_ref"] = align["reference_word"].notna()
     align["cost"] = cost_for_word_pair_by_similarity(align["similarity"]).fillna(epsilon_cost())
 
@@ -42,15 +44,21 @@ def per_sentence_cost() -> pd.DataFrame:
         .reset_index()
     )
     grouped = grouped[grouped["n_ref_words"] > 0]
-    grouped = grouped.merge(balanced, on="path", how="inner")
+    if balanced is not None:
+        grouped = grouped.merge(balanced, on="path", how="inner")
+    else:
+        # No balanced TSV: pull dialect_region / is_praeteritum from metadata.
+        metadata = load_metadata(dataset)[["path", "dialect_region", "is_praeteritum"]]
+        grouped = grouped.merge(metadata, on="path", how="inner")
+        grouped = grouped[grouped["dialect_region"].notna()]
     grouped["total_cost_per_ref_word"] = grouped["total_cost"] / grouped["n_ref_words"]
     return grouped
 
 
 @st.cache_data
-def regional_summary(include_praet: bool) -> pd.DataFrame:
+def regional_summary(include_praet: bool, dataset: str) -> pd.DataFrame:
     """Per-region mean total cost (DAT, DIT), total cost delta (DIT − DAT), n. Sorted by delta desc."""
-    df = per_sentence_cost()
+    df = per_sentence_cost(dataset)
     if not include_praet:
         df = df[~df["is_praeteritum"].fillna(False).astype(bool)]
 
@@ -75,15 +83,20 @@ def regional_summary(include_praet: bool) -> pd.DataFrame:
     return out.sort_values("total cost delta (DIT − DAT)", ascending=False).reset_index()
 
 
-def render_intro() -> None:
+def render_intro(uses_balanced: bool) -> None:
     """Page-level explanatory Markdown above the charts."""
+    subset_clause = (
+        "Computed on the **train_balanced** subset (~25k sentences per region; subset of train_all). "
+        if uses_balanced else
+        "Computed on the full filtered train_all set; per-region sentence counts vary "
+        "(see the *n sentences* column). "
+    )
     st.markdown(
         "Dialect distance per region, measured as mean per-sentence **total alignment "
         f"cost** (sum of per-edge costs: substitution = 1 − similarity, ε rows = λ = {LAMBDA}; sum "
-        "divided by reference word count). Computed on the **train_balanced** subset (~25k sentences "
-        "per region; subset of train_all). Lower total cost = closer to Standard German; higher "
-        "**total cost delta (DIT − DAT)** = stronger dialect signal. Regions sorted by delta "
-        "(descending)."
+        f"divided by reference word count). {subset_clause}Lower total cost = closer to Standard "
+        "German; higher **total cost delta (DIT − DAT)** = stronger dialect signal. Regions sorted "
+        "by delta (descending)."
     )
 
 
@@ -144,15 +157,21 @@ def render_headline_plots(summary: pd.DataFrame, regions_sorted: list[str]) -> N
     st.altair_chart((delta_chart + zero).properties(height=220), use_container_width=True)
 
 
-def render_summary_table(summary: pd.DataFrame) -> None:
+def render_summary_table(summary: pd.DataFrame, uses_balanced: bool) -> None:
     """Per-region summary table with rounded total cost columns."""
     st.markdown("### Per-region summary")
-    st.caption("Dialect distance per region: per-sentence total alignment cost averaged across all train_balanced "
-               "sentences in the region, plus the DIT-vs-DAT delta.")
+    subset_clause = "all train_balanced sentences" if uses_balanced else "all filtered sentences"
+    st.caption(f"Dialect distance per region: per-sentence total alignment cost averaged across {subset_clause} "
+               "in the region, plus the DIT-vs-DAT delta.")
     display_table = summary.copy()
     for col in ("DAT mean total cost", "DIT mean total cost", "total cost delta (DIT − DAT)"):
         display_table[col] = display_table[col].round(4)
 
+    n_help = (
+        "Number of sentences from the train_balanced subset contributing to this region's means."
+        if uses_balanced else
+        "Number of sentences contributing to this region's means (varies; no balanced subset)."
+    )
     column_config = {
         "DAT mean total cost": st.column_config.NumberColumn(
             help="Mean DAT total cost: average per-sentence total alignment cost across all sentences in this region.",
@@ -163,9 +182,7 @@ def render_summary_table(summary: pd.DataFrame) -> None:
         "total cost delta (DIT − DAT)": st.column_config.NumberColumn(
             help="Total cost delta: DIT mean total cost − DAT mean total cost.",
         ),
-        "n sentences": st.column_config.NumberColumn(
-            help="Number of sentences from the train_balanced subset contributing to this region's means.",
-        ),
+        "n sentences": st.column_config.NumberColumn(help=n_help),
     }
     st.dataframe(display_table, hide_index=True, use_container_width=True, column_config=column_config)
     st.caption("Default ordering: descending by **total cost delta (DIT − DAT)**.")
