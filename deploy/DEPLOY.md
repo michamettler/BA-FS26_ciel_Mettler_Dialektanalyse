@@ -1,12 +1,8 @@
 # Deployment runbook — Streamlit viz (ZHAW-internal, HTTP, port 8501)
 
-Hosts the dialect-analysis viz (`visualization/Home.py`) on the internal network, reachable in a
-browser at `http://<server-hostname>:8501`. Plain HTTP, no reverse proxy. Access is gated behind a
-shared password (`visualization/_auth.py`, read from `.streamlit/secrets.toml`).
-
-Assumes the server already has: SSH + sudo, the public repo cloned, a working `uv` environment, and
-the audio staged at `<repo>/datasets/…` (same layout as the repo). Everything else the viz reads
-(alignment parquets, metadata TSVs, `train_balanced.tsv`) is git-tracked and arrives with the clone.
+Hosts the dialect-analysis viz (`visualization/Home.py`) on the internal network, reachable in a 
+browser at `http://<server-hostname>:8501`.
+Access is gated behind a shared password (`visualization/_auth.py`, read from `.streamlit/secrets.toml`).
 
 ## Steps
 
