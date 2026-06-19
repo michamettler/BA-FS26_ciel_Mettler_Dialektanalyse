@@ -4,7 +4,7 @@ import pandas as pd
 import streamlit as st
 from streamlit_echarts import JsCode, st_echarts
 
-from _data import MODE_TO_MODEL, REGION_COLORS, CloudMode, tfidf_matrix_pairs
+from _data import REGION_COLORS, CloudMode, pair_region_counts, tfidf_matrix_pairs
 
 _TABLE_COLUMNS = ["pair", "TF-IDF", "peak region", "count"]
 _TOP_N = 200
@@ -25,7 +25,7 @@ def render_caption(mode: CloudMode = "ref_dit") -> None:
     )
 
 
-def compute_top_table(df_view: pd.DataFrame, selected_regions: list[str], include_preterite: bool,
+def compute_top_table(selected_regions: list[str], include_preterite: bool,
                       mode: CloudMode, dataset: str) -> pd.DataFrame:
     """Top-N pairs ranked by max TF-IDF across the selected regions, for the chosen mode."""
     matrix, vocab, _word_to_idx, region_order = tfidf_matrix_pairs(include_preterite, mode, dataset)
@@ -43,16 +43,7 @@ def compute_top_table(df_view: pd.DataFrame, selected_regions: list[str], includ
     peak_region_indices = sub_matrix.argmax(axis=0)
     selected_region_names = [region_order[i] for i in selected_idx]
 
-    counts_by_pair_region = (
-        df_view[df_view["model"] == MODE_TO_MODEL[mode]]
-        .dropna(subset=["hypothesis_word", "reference_word"])
-        .pipe(lambda d: d[
-            d["reference_word"] != d["hypothesis_word"]])  # filter out matches where ref and hyp are the same word
-        .assign(pair=lambda d: d["reference_word"] + "+" + d["hypothesis_word"])
-        .groupby(["pair", "dialect_region"])
-        .size()
-        .unstack(fill_value=0)
-    )
+    counts_by_pair_region = pair_region_counts(dataset, tuple(selected_regions), include_preterite, mode)
 
     def peak_over_total(pair_str: str, peak_region: str) -> str:
         if pair_str not in counts_by_pair_region.index:
