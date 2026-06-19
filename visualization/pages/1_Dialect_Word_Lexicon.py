@@ -16,7 +16,7 @@ import _lexicon_detail as detail  # noqa: E402
 import _lexicon_overview as overview  # noqa: E402
 from _auth import require_password  # noqa: E402
 from _data import (  # noqa: E402
-    COMBINED, DATASET_CHOICES, DEFAULT_DATASET, REGION_COLORS, REGIONS,
+    DATASET_CHOICES, DEFAULT_DATASET, REGION_COLORS, REGIONS,
     CloudMode, joined_view, lexicon_search_index,
 )
 
@@ -32,14 +32,8 @@ dataset = st.sidebar.selectbox(
     DATASET_CHOICES,
     index=DATASET_CHOICES.index(DEFAULT_DATASET),
     key="selected_dataset",
-    help="Switch between STT4SG-350, SDS-200, or Combined (both datasets concatenated).",
+    help="Switch between STT4SG-350 and SDS-200.",
 )
-if dataset == COMBINED:
-    st.info(
-        "**Combined view** concatenates STT4SG-350 and SDS-200 and treats them as one sample. "
-        "Recording conditions differ between corpora, so patterns confirmed in both are more "
-        "robust than patterns from a single dataset."
-    )
 
 region_filter = st.sidebar.multiselect(
     "Filter regions",

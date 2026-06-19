@@ -84,8 +84,7 @@ SDS200 = DatasetConfig(
 )
 
 DATASETS: dict[str, DatasetConfig] = {STT4SG.name: STT4SG, SDS200.name: SDS200}
-COMBINED = "Combined"
-DATASET_CHOICES: tuple[str, ...] = (STT4SG.name, SDS200.name, COMBINED)
+DATASET_CHOICES: tuple[str, ...] = (STT4SG.name, SDS200.name)
 DEFAULT_DATASET = STT4SG.name
 
 REGIONS = ["Wallis", "Zürich", "Bern", "Basel", "Graubünden", "Innerschweiz", "Ostschweiz"]
@@ -134,17 +133,14 @@ def deletion_similarity() -> float:
 @st.cache_data
 def load_alignments(dataset: str, include_dat_dit: bool = False) -> pd.DataFrame:
     """Concat the REF-anchored alignment parquets for the given dataset; opt-in to also include DAT-DIT."""
-    if dataset == COMBINED:
-        out = pd.concat([load_alignments(name, include_dat_dit) for name in DATASETS], ignore_index=True)
-    else:
-        cfg = DATASETS[dataset]
-        dat = pd.read_parquet(cfg.dat_parquet).assign(model="dialect-aware", dataset=cfg.name)
-        dit = pd.read_parquet(cfg.dit_parquet).assign(model="dialect-ignorant", dataset=cfg.name)
-        frames = [dat, dit]
-        if include_dat_dit:
-            dat_dit = pd.read_parquet(cfg.dat_dit_parquet).assign(model="dat-dit", dataset=cfg.name)
-            frames.append(dat_dit)
-        out = pd.concat(frames, ignore_index=True)
+    cfg = DATASETS[dataset]
+    dat = pd.read_parquet(cfg.dat_parquet).assign(model="dialect-aware")
+    dit = pd.read_parquet(cfg.dit_parquet).assign(model="dialect-ignorant")
+    frames = [dat, dit]
+    if include_dat_dit:
+        dat_dit = pd.read_parquet(cfg.dat_dit_parquet).assign(model="dat-dit")
+        frames.append(dat_dit)
+    out = pd.concat(frames, ignore_index=True)
     # `model` is low-cardinality and heavily filtered/grouped on — category cuts memory and speeds groupbys.
     out["model"] = out["model"].astype("category")
     return out
@@ -186,18 +182,14 @@ def _load_metadata_clip_id_joined(cfg: DatasetConfig) -> pd.DataFrame:
 
 @st.cache_data
 def load_metadata(dataset: str) -> pd.DataFrame:
-    """Per-sentence metadata for the given dataset. Combined concats all datasets, tagged with `dataset`."""
-    if dataset == COMBINED:
-        df = pd.concat([load_metadata(name) for name in DATASETS], ignore_index=True)
+    """Per-sentence metadata for the given dataset."""
+    cfg = DATASETS[dataset]
+    if cfg.metadata_join_key == "path":
+        df = _load_metadata_path_joined(cfg)
+    elif cfg.metadata_join_key == "clip_id":
+        df = _load_metadata_clip_id_joined(cfg)
     else:
-        cfg = DATASETS[dataset]
-        if cfg.metadata_join_key == "path":
-            df = _load_metadata_path_joined(cfg)
-        elif cfg.metadata_join_key == "clip_id":
-            df = _load_metadata_clip_id_joined(cfg)
-        else:
-            raise ValueError(f"Unknown metadata_join_key: {cfg.metadata_join_key}")
-        df["dataset"] = cfg.name
+        raise ValueError(f"Unknown metadata_join_key: {cfg.metadata_join_key}")
     # `dialect_region` is the dominant groupby/filter key — category speeds those and cuts memory.
     df["dialect_region"] = df["dialect_region"].astype("category")
     return df
@@ -205,10 +197,10 @@ def load_metadata(dataset: str) -> pd.DataFrame:
 
 @st.cache_data
 def joined_view(regions: tuple[str, ...], dataset: str, include_dat_dit: bool = False) -> pd.DataFrame:
-    """Alignments & metadata for the given dataset, filtered to the selected regions. Merges on `[path, dataset]`."""
+    """Alignments & metadata for the given dataset, filtered to the selected regions."""
     alignments = load_alignments(dataset, include_dat_dit)
     metadata = load_metadata(dataset)
-    df = alignments.merge(metadata, on=["path", "dataset"], how="left")
+    df = alignments.merge(metadata, on="path", how="left")
     return df[df["dialect_region"].isin(regions)].reset_index(drop=True)
 
 
@@ -216,10 +208,8 @@ def joined_view(regions: tuple[str, ...], dataset: str, include_dat_dit: bool = 
 def load_balanced_paths(dataset: str) -> pd.DataFrame | None:
     """train_balanced.tsv joined with the praeteritum flag (path, region, is_praeteritum).
 
-    Returns `None` when the dataset has no curated balanced subset (SDS-200) or in Combined mode.
+    Returns `None` when the dataset has no curated balanced subset (SDS-200).
     """
-    if dataset == COMBINED:
-        return None
     cfg = DATASETS[dataset]
     if cfg.balanced_tsv is None:
         return None
