@@ -5,7 +5,10 @@ Run: streamlit run visualization/Home.py
 """
 import streamlit as st
 
+from _auth import require_password
+
 st.set_page_config(page_title="Swiss German Dialect Analysis", layout="wide")
+require_password()
 st.title("Swiss German Dialect Analysis")
 
 st.markdown(

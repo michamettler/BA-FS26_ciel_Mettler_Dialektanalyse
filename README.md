@@ -77,11 +77,11 @@ a word-cloud overview of dialect-distinctive substitution pairs, a per-word
 detail view with side-by-side DIT and DAT hypothesis tables, audio playback
 per clip, and the bipartite-matching plots for individual sentences.
 
-> **Not yet publicly deployed.** The hosted URL and deployment instructions
-> will be added to this README before the thesis defense.
-
 To run the tool locally after completing setup:
 
 ```bash
 streamlit run visualization/Home.py
 ```
+
+For the ZHAW-internal server deployment (HTTP on port 8501, password-gated), see
+[`deploy/DEPLOY.md`](deploy/DEPLOY.md).
