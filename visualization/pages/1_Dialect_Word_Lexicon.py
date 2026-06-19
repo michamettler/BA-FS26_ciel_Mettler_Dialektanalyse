@@ -17,7 +17,7 @@ import _lexicon_overview as overview  # noqa: E402
 from _auth import require_password  # noqa: E402
 from _data import (  # noqa: E402
     COMBINED, DATASET_CHOICES, DEFAULT_DATASET, REGION_COLORS, REGIONS,
-    CloudMode, joined_view,
+    CloudMode, joined_view, lexicon_search_index,
 )
 
 
@@ -65,23 +65,14 @@ include_preterite = st.sidebar.toggle(
          "can introduce noise in the transcripts. Exclude them to focus on dialect specifics; include for more data.")
 
 with st.spinner("Loading alignment data..."):
-    df = joined_view(tuple(selected_regions), dataset, include_dat_dit=True)
+    # Cached per (dataset, regions, preterite): ref-word frequencies + sidebar counts. Keeps the
+    # search box responsive — these don't recompute on every keystroke. The full frame is loaded
+    # lazily only when a word is selected (detail view), so the overview path skips it entirely.
+    ref_counts, n_alignments, n_sentences = lexicon_search_index(
+        dataset, tuple(selected_regions), include_preterite)
 
-if not include_preterite:
-    df = df[~df["is_praeteritum"].fillna(False).astype(bool)]
-
-ref_only = df[df["model"] != "dat-dit"]
-
-st.sidebar.metric("Alignments", f"{len(ref_only):,}")
-st.sidebar.metric("Unique sentences", f"{df['path'].nunique():,}")
-
-# Reference-word frequencies (substitution + deletion edges only: drop insertions where ref_word is NA (epsilon))
-ref_counts = (
-    ref_only[ref_only["reference_word"].notna()]
-    .groupby("reference_word")
-    .size()
-    .sort_values(ascending=False)
-)
+st.sidebar.metric("Alignments", f"{n_alignments:,}")
+st.sidebar.metric("Unique sentences", f"{n_sentences:,}")
 
 # Search box
 search_options = [""] + ref_counts.index.tolist()
@@ -108,8 +99,7 @@ def render_detail(df_view: pd.DataFrame, word: str, regions: list[str],
     detail.render_example_sentences(df_view, word_rows, word, regions, include_preterite, dataset)
 
 
-def render_overview(df_view: pd.DataFrame, regions: list[str], include_preterite: bool,
-                    dataset: str) -> None:
+def render_overview(regions: list[str], include_preterite: bool, dataset: str) -> None:
     """Word-cloud overview of regionally distinctive substitution pairs."""
     mode_label = st.radio(
         "Compare",
@@ -119,7 +109,7 @@ def render_overview(df_view: pd.DataFrame, regions: list[str], include_preterite
     )
     mode: CloudMode = "ref_dit" if mode_label.startswith("Reference") else "dat_dit"
     overview.render_caption(mode)
-    table = overview.compute_top_table(df_view, regions, include_preterite, mode, dataset)
+    table = overview.compute_top_table(regions, include_preterite, mode, dataset)
     if table.empty:
         st.warning("No regionally distinctive pairs in the selected regions.")
         return
@@ -128,6 +118,10 @@ def render_overview(df_view: pd.DataFrame, regions: list[str], include_preterite
 
 
 if selected_word:
+    # Full frame needed only for the detail view; load it lazily here.
+    df = joined_view(tuple(selected_regions), dataset, include_dat_dit=True)
+    if not include_preterite:
+        df = df[~df["is_praeteritum"].fillna(False).astype(bool)]
     render_detail(df, selected_word, selected_regions, include_preterite, dataset)
 else:
-    render_overview(df, selected_regions, include_preterite, dataset)
+    render_overview(selected_regions, include_preterite, dataset)

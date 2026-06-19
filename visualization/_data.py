@@ -135,16 +135,19 @@ def deletion_similarity() -> float:
 def load_alignments(dataset: str, include_dat_dit: bool = False) -> pd.DataFrame:
     """Concat the REF-anchored alignment parquets for the given dataset; opt-in to also include DAT-DIT."""
     if dataset == COMBINED:
-        frames = [load_alignments(name, include_dat_dit) for name in DATASETS]
-        return pd.concat(frames, ignore_index=True)
-    cfg = DATASETS[dataset]
-    dat = pd.read_parquet(cfg.dat_parquet).assign(model="dialect-aware", dataset=cfg.name)
-    dit = pd.read_parquet(cfg.dit_parquet).assign(model="dialect-ignorant", dataset=cfg.name)
-    frames = [dat, dit]
-    if include_dat_dit:
-        dat_dit = pd.read_parquet(cfg.dat_dit_parquet).assign(model="dat-dit", dataset=cfg.name)
-        frames.append(dat_dit)
-    return pd.concat(frames, ignore_index=True)
+        out = pd.concat([load_alignments(name, include_dat_dit) for name in DATASETS], ignore_index=True)
+    else:
+        cfg = DATASETS[dataset]
+        dat = pd.read_parquet(cfg.dat_parquet).assign(model="dialect-aware", dataset=cfg.name)
+        dit = pd.read_parquet(cfg.dit_parquet).assign(model="dialect-ignorant", dataset=cfg.name)
+        frames = [dat, dit]
+        if include_dat_dit:
+            dat_dit = pd.read_parquet(cfg.dat_dit_parquet).assign(model="dat-dit", dataset=cfg.name)
+            frames.append(dat_dit)
+        out = pd.concat(frames, ignore_index=True)
+    # `model` is low-cardinality and heavily filtered/grouped on — category cuts memory and speeds groupbys.
+    out["model"] = out["model"].astype("category")
+    return out
 
 
 def _load_metadata_path_joined(cfg: DatasetConfig) -> pd.DataFrame:
@@ -185,15 +188,18 @@ def _load_metadata_clip_id_joined(cfg: DatasetConfig) -> pd.DataFrame:
 def load_metadata(dataset: str) -> pd.DataFrame:
     """Per-sentence metadata for the given dataset. Combined concats all datasets, tagged with `dataset`."""
     if dataset == COMBINED:
-        return pd.concat([load_metadata(name) for name in DATASETS], ignore_index=True)
-    cfg = DATASETS[dataset]
-    if cfg.metadata_join_key == "path":
-        df = _load_metadata_path_joined(cfg)
-    elif cfg.metadata_join_key == "clip_id":
-        df = _load_metadata_clip_id_joined(cfg)
+        df = pd.concat([load_metadata(name) for name in DATASETS], ignore_index=True)
     else:
-        raise ValueError(f"Unknown metadata_join_key: {cfg.metadata_join_key}")
-    df["dataset"] = cfg.name
+        cfg = DATASETS[dataset]
+        if cfg.metadata_join_key == "path":
+            df = _load_metadata_path_joined(cfg)
+        elif cfg.metadata_join_key == "clip_id":
+            df = _load_metadata_clip_id_joined(cfg)
+        else:
+            raise ValueError(f"Unknown metadata_join_key: {cfg.metadata_join_key}")
+        df["dataset"] = cfg.name
+    # `dialect_region` is the dominant groupby/filter key — category speeds those and cuts memory.
+    df["dialect_region"] = df["dialect_region"].astype("category")
     return df
 
 
@@ -252,4 +258,36 @@ def tfidf_matrix_pairs(include_preterite: bool, mode: CloudMode, dataset: str) -
         vocab=vec.get_feature_names_out().tolist(),
         word_to_idx=cast(dict[str, int], dict(vec.vocabulary_)),  # for column lookup from detail view (word selected)
         region_order=list(REGIONS),
+    )
+
+
+@st.cache_data
+def lexicon_search_index(dataset: str, regions: tuple[str, ...], include_preterite: bool):
+    """Page-1 search aggregates: ref-word frequency table + sidebar metric counts.
+    Cached per filter combo so they don't recompute on every rerun (e.g. each keystroke in the search box).
+    Returns (ref_counts Series, n_alignments, n_sentences)."""
+    df = joined_view(regions, dataset, include_dat_dit=True)
+    if not include_preterite:
+        df = df[~df["is_praeteritum"].fillna(False).astype(bool)]
+    ref_only = df[df["model"] != "dat-dit"]
+    ref_counts = (
+        ref_only[ref_only["reference_word"].notna()]
+        .groupby("reference_word").size().sort_values(ascending=False)
+    )
+    return ref_counts, int(len(ref_only)), int(df["path"].nunique())
+
+
+@st.cache_data
+def pair_region_counts(dataset: str, regions: tuple[str, ...], include_preterite: bool, mode: CloudMode) -> pd.DataFrame:
+    """(ref+hyp) pair x region occurrence counts behind the word cloud, cached per filter combo so the
+    overview groupby doesn't rerun on every interaction. Index = `ref+hyp` pair, columns = regions."""
+    df = joined_view(regions, dataset, include_dat_dit=True)
+    if not include_preterite:
+        df = df[~df["is_praeteritum"].fillna(False).astype(bool)]
+    df = df[df["model"] == MODE_TO_MODEL[mode]].dropna(subset=["hypothesis_word", "reference_word"])
+    df = df[df["reference_word"] != df["hypothesis_word"]]
+    pair = df["reference_word"] + "+" + df["hypothesis_word"]
+    return (
+        pd.DataFrame({"pair": pair, "dialect_region": df["dialect_region"]})
+        .groupby(["pair", "dialect_region"], observed=True).size().unstack(fill_value=0)
     )
