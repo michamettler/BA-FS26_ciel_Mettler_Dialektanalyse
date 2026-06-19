@@ -178,7 +178,7 @@ def render_example_sentences(df_view: pd.DataFrame, word_rows: pd.DataFrame, wor
             ),
         )
         .drop_duplicates(["path", "_variant"])
-        [["path", "dataset", "hypothesis_word", "_variant", "_region_idx",
+        [["path", "hypothesis_word", "_variant", "_region_idx",
           "dialect_region", "gender", "age",
           "reference", "dat_hypothesis", "dit_hypothesis"]]
     )
@@ -246,7 +246,7 @@ def render_example_sentences(df_view: pd.DataFrame, word_rows: pd.DataFrame, wor
             page_paths = variant_paths.iloc[start:start + page_size]
 
             for _, row in page_paths.iterrows():
-                _render_example_sentence_expander(row, rows_by_path[row["path"]], word)
+                _render_example_sentence_expander(row, rows_by_path[row["path"]], word, dataset)
 
 
 def _hypothesis_table(slice_df: pd.DataFrame, ref_word: str, model: str,
@@ -350,7 +350,7 @@ def _back_to_cloud():
     st.session_state["selected_word"] = ""
 
 
-def _render_example_sentence_expander(row: pd.Series, sentence_rows: pd.DataFrame, word: str) -> None:
+def _render_example_sentence_expander(row: pd.Series, sentence_rows: pd.DataFrame, word: str, dataset: str) -> None:
     """One sentence expander: region + clip metadata, audio player, reference + hypotheses, alignment HTML,
     and an optional technical alignment graph."""
     path = row["path"]
@@ -360,7 +360,7 @@ def _render_example_sentence_expander(row: pd.Series, sentence_rows: pd.DataFram
     with st.expander(header):
         st.markdown(f"**Clip ID:** `{path}`")
 
-        audio_file = _resolve_audio_path(path, row["dataset"])
+        audio_file = _resolve_audio_path(path, dataset)
         if audio_file is None:
             st.caption(f"Audio file not found locally: `{path}`")
         else:

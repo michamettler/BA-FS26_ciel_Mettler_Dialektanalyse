@@ -2,9 +2,9 @@
 Regional Distance from Standard German: Page 2.
 
 Dialect distance per region, computed as the mean of (per-sentence total alignment cost / sentence's ref-word count)
-across all sentences in the region. STT4SG-350 mode restricts to the train_balanced subset
-(~25k sentences per region) for comparable samples; SDS-200 and Combined have no balanced subset
-and run on the full filtered set (caveat banner shown).
+across all sentences in the region. STT4SG-350 restricts to the train_balanced subset
+(~25k sentences per region) for comparable samples; SDS-200 has no balanced subset and runs on the
+full filtered set (caveat banner shown).
 """
 import sys
 from pathlib import Path
@@ -15,7 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import _regional_distance as regional  # noqa: E402
 from _auth import require_password  # noqa: E402
 from _data import (  # noqa: E402
-    COMBINED, DATASET_CHOICES, DEFAULT_DATASET,
+    DATASET_CHOICES, DEFAULT_DATASET,
     load_alignments, load_balanced_paths,
 )
 
@@ -29,21 +29,15 @@ dataset = st.sidebar.selectbox(
     DATASET_CHOICES,
     index=DATASET_CHOICES.index(DEFAULT_DATASET),
     key="selected_dataset",
-    help="Switch between STT4SG-350, SDS-200, or Combined (both datasets concatenated).",
+    help="Switch between STT4SG-350 and SDS-200.",
 )
 uses_balanced = load_balanced_paths(dataset) is not None
 regional.render_intro(uses_balanced)
 if not uses_balanced:
-    if dataset == COMBINED:
-        st.warning(
-            "**Combined view** disables the STT4SG-350 balanced-paths filter. Per-region sentence "
-            "counts vary (especially for SDS-200), so read per-region means as descriptive."
-        )
-    else:
-        st.warning(
-            f"**{dataset}** has no curated balanced subset. Per-region sentence counts vary "
-            "considerably, so read per-region means as descriptive, not statistically balanced."
-        )
+    st.warning(
+        f"**{dataset}** has no curated balanced subset. Per-region sentence counts vary "
+        "considerably, so read per-region means as descriptive, not statistically balanced."
+    )
 
 include_preterite = st.sidebar.toggle(
     "Include Preterite sentences",

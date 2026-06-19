@@ -37,11 +37,7 @@ transcript are precomputed by the bipartite matching solver (see
   No curated balanced subset, so Regional Distance falls back to the full filtered set and shows
   a caveat banner.
 
-Use the **Dataset** selector in each page's sidebar to switch between them. A third
-**Combined** option concatenates the two datasets and treats them as a single sample for
-downstream aggregations (per-region counts, TF-IDF, mean costs). Recording conditions differ
-between corpora, so patterns confirmed in both are more robust than patterns from a single
-dataset.
+Use the **Dataset** selector in each page's sidebar to switch between them.
 
 ### Pages
 
