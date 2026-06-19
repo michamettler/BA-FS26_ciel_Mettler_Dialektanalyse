@@ -72,6 +72,9 @@ The full reproduction procedure (calibration => alignment => visualization) is d
 
 ## Interactive Web Tool
 
+**Access (ZHAW-internal, password-gated):** http://160.85.66.77
+(temporary IP; a DNS name will replace it later.)
+
 The Streamlit application provides interactive access to the analysis results:
 a word-cloud overview of dialect-distinctive substitution pairs, a per-word
 detail view with side-by-side DIT and DAT hypothesis tables, audio playback
@@ -83,5 +86,5 @@ To run the tool locally after completing setup:
 streamlit run visualization/Home.py
 ```
 
-For the ZHAW-internal server deployment (HTTP on port 8501, password-gated), see
+For the ZHAW-internal server deployment (HTTP, password-gated), see
 [`deploy/DEPLOY.md`](deploy/DEPLOY.md).
