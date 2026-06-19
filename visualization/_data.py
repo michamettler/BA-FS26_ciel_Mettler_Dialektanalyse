@@ -263,25 +263,23 @@ def tfidf_matrix_pairs(include_preterite: bool, mode: CloudMode, dataset: str) -
 
 @st.cache_data
 def lexicon_search_index(dataset: str, regions: tuple[str, ...], include_preterite: bool):
-    """Page-1 search aggregates: ref-word frequency table + sidebar metric counts.
-    Cached per filter combo so they don't recompute on every rerun (e.g. each keystroke in the search box).
-    Returns (ref_counts Series, n_alignments, n_sentences)."""
-    df = joined_view(regions, dataset, include_dat_dit=True)
+    """Page-1 search aggregates: ref-word frequency table + sidebar metric counts, cached per filter combo so they
+    don't recompute on every rerun."""
+    df = joined_view(regions, dataset)  # include_dat_dit=False
     if not include_preterite:
         df = df[~df["is_praeteritum"].fillna(False).astype(bool)]
-    ref_only = df[df["model"] != "dat-dit"]
     ref_counts = (
-        ref_only[ref_only["reference_word"].notna()]
+        df[df["reference_word"].notna()]
         .groupby("reference_word").size().sort_values(ascending=False)
     )
-    return ref_counts, int(len(ref_only)), int(df["path"].nunique())
+    return ref_counts, int(len(df)), int(df["path"].nunique())
 
 
 @st.cache_data
 def pair_region_counts(dataset: str, regions: tuple[str, ...], include_preterite: bool, mode: CloudMode) -> pd.DataFrame:
     """(ref+hyp) pair x region occurrence counts behind the word cloud, cached per filter combo so the
-    overview groupby doesn't rerun on every interaction. Index = `ref+hyp` pair, columns = regions."""
-    df = joined_view(regions, dataset, include_dat_dit=True)
+    overview groupby doesn't rerun on every interaction."""
+    df = joined_view(regions, dataset, include_dat_dit=(mode == "dat_dit"))
     if not include_preterite:
         df = df[~df["is_praeteritum"].fillna(False).astype(bool)]
     df = df[df["model"] == MODE_TO_MODEL[mode]].dropna(subset=["hypothesis_word", "reference_word"])
