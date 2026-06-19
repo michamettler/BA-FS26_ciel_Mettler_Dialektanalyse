@@ -145,6 +145,9 @@ celerybeat.pid
 # SageMath parsed files
 *.sage.py
 
+# Streamlit secrets (deployment password lives here; created on the server only)
+.streamlit/secrets.toml
+
 # Environments
 .env
 .envrc
