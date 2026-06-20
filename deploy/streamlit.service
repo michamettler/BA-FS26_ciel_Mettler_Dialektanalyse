@@ -8,11 +8,11 @@ Description=Dialect Analysis Streamlit viz
 After=network.target
 
 [Service]
-User=mettlmi1
+User=dialectanalysis
 # Allow binding port 80 (a privileged port) while still running as an unprivileged user.
 AmbientCapabilities=CAP_NET_BIND_SERVICE
-WorkingDirectory=/home/mettlmi1/Developer/BA-FS26_ciel_Mettler_Dialektanalyse
-ExecStart=/home/mettlmi1/Developer/BA-FS26_ciel_Mettler_Dialektanalyse/.venv/bin/streamlit run visualization/Home.py --server.port 80 --server.address 0.0.0.0 --server.headless true
+WorkingDirectory=/opt/dialect-analysis
+ExecStart=/opt/dialect-analysis/.venv/bin/streamlit run visualization/Home.py --server.port 80 --server.address 0.0.0.0 --server.headless true
 Restart=always
 RestartSec=3
 
