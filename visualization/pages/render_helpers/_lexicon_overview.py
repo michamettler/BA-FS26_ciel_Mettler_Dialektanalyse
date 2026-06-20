@@ -18,6 +18,7 @@ _MODE_PAIR_LABEL: dict[CloudMode, str] = {
 def render_caption(mode: CloudMode = "ref_dit") -> None:
     """Section header and explanatory text above the word cloud."""
     pair_label = _MODE_PAIR_LABEL[mode]
+
     st.markdown("### Word Cloud for Dialect Specific Candidates")
     st.markdown(
         f"{pair_label} pairs ranked by their **TF-IDF** score across the selected regions (treated as documents). "
@@ -29,15 +30,19 @@ def compute_top_table(selected_regions: list[str], include_preterite: bool,
                       mode: CloudMode, dataset: str) -> pd.DataFrame:
     """Top-N pairs ranked by max TF-IDF across the selected regions, for the chosen mode."""
     matrix, vocab, _word_to_idx, region_order = tfidf_matrix_pairs(include_preterite, mode, dataset)
+
     selected_idx = [i for i, r in enumerate(region_order) if r in selected_regions]
+
     if not selected_idx:
         return pd.DataFrame(columns=_TABLE_COLUMNS)
 
     sub_matrix = matrix[selected_idx, :]
     scores = sub_matrix.max(axis=0)
+
     nonzero = np.flatnonzero(scores > 0)
     if nonzero.size == 0:
         return pd.DataFrame(columns=_TABLE_COLUMNS)
+
     order = nonzero[np.argsort(-scores[nonzero])][:_TOP_N]
 
     peak_region_indices = sub_matrix.argmax(axis=0)
@@ -147,8 +152,10 @@ def _decode_pair(p: str) -> str:
 def _render_region_legend(table: pd.DataFrame) -> None:
     """Inline color legend below the cloud, listing only regions that appear as peaks."""
     peaks_in_view = [r for r in REGION_COLORS if (table["peak region"] == r).any()]
+
     if not peaks_in_view:
         return
+
     swatches = " &nbsp; ".join(
         f'<span style="display:inline-block;width:12px;height:12px;background:{REGION_COLORS[r]};'
         f'margin-right:4px;vertical-align:middle;border-radius:2px;"></span>{r}'

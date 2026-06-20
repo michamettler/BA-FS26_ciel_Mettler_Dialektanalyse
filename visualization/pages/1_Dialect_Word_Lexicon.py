@@ -12,11 +12,10 @@ import pandas as pd
 import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-import _lexicon_detail as detail  # noqa: E402
-import _lexicon_overview as overview  # noqa: E402
+from pages.render_helpers import _lexicon_detail as detail, _lexicon_overview as overview
 from _data import (  # noqa: E402
     DATASET_CHOICES, DEFAULT_DATASET, REGION_COLORS, REGIONS,
-    CloudMode, joined_view, lexicon_search_index,
+    CloudMode, load_region_alignments_and_metadata, lexicon_search_index,
 )
 
 
@@ -57,11 +56,10 @@ include_preterite = st.sidebar.toggle(
          "can introduce noise in the transcripts. Exclude them to focus on dialect specifics; include for more data.")
 
 with st.spinner("Loading alignment data..."):
-    # Cached per (dataset, regions, preterite): ref-word frequencies + sidebar counts. Keeps the
-    # search box responsive — these don't recompute on every keystroke. The full frame is loaded
-    # lazily only when a word is selected (detail view), so the overview path skips it entirely.
+    # Cached per (dataset, regions, preterite): ref-word frequencies + sidebar counts.
     ref_counts, n_alignments, n_sentences = lexicon_search_index(
-        dataset, tuple(selected_regions), include_preterite)
+        dataset, tuple(selected_regions), include_preterite
+    )
 
 st.sidebar.metric("Alignments", f"{n_alignments:,}")
 st.sidebar.metric("Unique sentences", f"{n_sentences:,}")
@@ -85,6 +83,7 @@ def render_detail(df_view: pd.DataFrame, word: str, regions: list[str],
                   include_preterite: bool, dataset: str) -> None:
     """Per-reference-word detail view: header, hypothesis tables, charts, regional table, examples."""
     word_rows = df_view[(df_view["reference_word"] == word) & (df_view["model"] != "dat-dit")]
+
     detail.render_header(word, word_rows, regions)
     detail.render_word_chart(word_rows)
     detail.render_hypothesis_tables(word, word_rows, regions, include_preterite, dataset)
@@ -100,18 +99,21 @@ def render_overview(regions: list[str], include_preterite: bool, dataset: str) -
         key="cloud_mode",
     )
     mode: CloudMode = "ref_dit" if mode_label.startswith("Reference") else "dat_dit"
+
     overview.render_caption(mode)
     table = overview.compute_top_table(regions, include_preterite, mode, dataset)
+
     if table.empty:
         st.warning("No regionally distinctive pairs in the selected regions.")
         return
+
     overview.render_word_cloud(table)
     overview.render_top_candidates_expander(table, mode)
 
 
 if selected_word:
     # Full frame needed only for the detail view; load it lazily here.
-    df = joined_view(tuple(selected_regions), dataset, include_dat_dit=True)
+    df = load_region_alignments_and_metadata(tuple(selected_regions), dataset, include_dat_dit=True)
     if not include_preterite:
         df = df[~df["is_praeteritum"].fillna(False).astype(bool)]
     render_detail(df, selected_word, selected_regions, include_preterite, dataset)
