@@ -51,8 +51,7 @@ Deploy an update (the common case):
 sudo -u dialectanalysis -H git -C /opt/dialect-analysis pull # or `dgit pull` if alias activated
 sudo -u dialectanalysis -H sh -c 'cd /opt/dialect-analysis && uv pip install -r requirements.txt' # only if Python dependencies changed
 sudo systemctl restart streamlit
-systemctl status streamlit          # expect: active (running)
-```
+sudo systemctl status streamlit          # expect: active (running)
 
 Service control and inspection:
 ```bash
