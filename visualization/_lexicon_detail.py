@@ -370,7 +370,7 @@ def _render_example_sentence_expander(row: pd.Series, sentence_rows: pd.DataFram
         elif not audio_unlocked():
             # Audio is the only gated feature: without the session unlock we never call st.audio,
             # so no media URL is minted and the clips can't be crawled.
-            st.caption("🔒 Audio locked — enter the password above to enable playback.")
+            st.caption("Audio locked, enter the password above to enable playback.")
         else:
             audio_key = f"audio_loaded_{path}"
             loaded = st.session_state.get(audio_key, False)
