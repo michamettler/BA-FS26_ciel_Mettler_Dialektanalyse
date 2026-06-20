@@ -14,6 +14,7 @@ _REPO_ROOT = _VIS_DIR.parent
 sys.path.insert(0, str(_REPO_ROOT / "scripts" / "domain"))
 sys.path.insert(0, str(_REPO_ROOT / "scripts" / "utils"))
 sys.path.insert(0, str(_VIS_DIR))
+from _auth import audio_unlocked, render_audio_gate  # noqa: E402
 from _data import (  # noqa: E402
     ALPHA, DATASETS, LAMBDA, REGIONS, USE_GLOBAL_LEXICAL_NORMALIZATION,
     USE_SQUARED_POSITIONAL, tfidf_matrix_pairs,
@@ -194,6 +195,9 @@ def render_example_sentences(df_view: pd.DataFrame, word_rows: pd.DataFrame, wor
     st.markdown(f"**Sentences with word-level alignment**: {n_unique_sentences:,} sentences "
                 f"across {len(variant_order)} DIT variants")
 
+    # One-time audio password prompt (the only gated feature); rendered once here, where clips appear.
+    render_audio_gate()
+
     # Outer paginator for variants: 10 per page.
     variant_page_size = 10
     n_variant_pages = max(1, (len(variant_order) + variant_page_size - 1) // variant_page_size)
@@ -363,6 +367,10 @@ def _render_example_sentence_expander(row: pd.Series, sentence_rows: pd.DataFram
         audio_file = _resolve_audio_path(path, dataset)
         if audio_file is None:
             st.caption(f"Audio file not found locally: `{path}`")
+        elif not audio_unlocked():
+            # Audio is the only gated feature: without the session unlock we never call st.audio,
+            # so no media URL is minted and the clips can't be crawled.
+            st.caption("Audio locked, enter the password above to enable playback.")
         else:
             audio_key = f"audio_loaded_{path}"
             loaded = st.session_state.get(audio_key, False)

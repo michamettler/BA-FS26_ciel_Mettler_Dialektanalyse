@@ -13,7 +13,6 @@ import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import _regional_distance as regional  # noqa: E402
-from _auth import require_password  # noqa: E402
 from _data import (  # noqa: E402
     DATASET_CHOICES, DEFAULT_DATASET,
     load_alignments, load_balanced_paths,
@@ -21,7 +20,6 @@ from _data import (  # noqa: E402
 
 # --- Page 2 ---
 st.set_page_config(page_title="Regional Distance", layout="wide")
-require_password()
 st.title("Regional Distance from Standard German")
 
 dataset = st.sidebar.selectbox(

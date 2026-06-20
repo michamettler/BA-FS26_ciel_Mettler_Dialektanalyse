@@ -14,7 +14,6 @@ import streamlit as st
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import _lexicon_detail as detail  # noqa: E402
 import _lexicon_overview as overview  # noqa: E402
-from _auth import require_password  # noqa: E402
 from _data import (  # noqa: E402
     DATASET_CHOICES, DEFAULT_DATASET, REGION_COLORS, REGIONS,
     CloudMode, joined_view, lexicon_search_index,
@@ -23,7 +22,6 @@ from _data import (  # noqa: E402
 
 # --- Page 1 ---
 st.set_page_config(page_title="Dialect Word Lexicon", layout="wide")
-require_password()
 st.title("Dialect Word Lexicon")
 
 # Sidebar filters
