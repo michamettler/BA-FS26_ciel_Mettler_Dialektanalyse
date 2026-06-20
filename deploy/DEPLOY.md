@@ -22,7 +22,7 @@ Nothing is computed from audio at runtime.
 - A single shared password gates the app so the audio isn't freely crawlable (anti-crawl, not
   per-user login). `visualization/_auth.py` reads it from `/opt/dialect-analysis/.streamlit/secrets.toml`.
   Every page is gated, since Streamlit lets you deep-link straight to a page.
-- Git auth is a repo-scoped **deploy key** at `/opt/dialect-analysis/.ssh/dialect_deploy`.
+- Git auth is a repo-scoped **deploy key** at `/opt/dialect-analysis/.ssh/dialect_deploy`, wired via the repo's `core.sshCommand` (so no personal GitHub credentials live on the box).
 - Dependencies live in a uv virtualenv at `/opt/dialect-analysis/.venv`.
 
 ## Server layout
