@@ -1,6 +1,6 @@
-# Deploying the Dialect Analysis viz
+# Deploying the Dialect Analysis Visualization
 
-How the viz is hosted on the ZHAW-internal server and how to maintain it. The deployment lives at
+How the Streamlit visualization is hosted on the ZHAW-internal server and how to maintain it. The deployment lives at
 `/opt/dialect-analysis` and runs under a dedicated service account, `dialectanalysis`.
 
 ## What it is
