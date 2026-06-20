@@ -158,6 +158,9 @@ ENV/
 env.bak/
 venv.bak/
 
+# SSH deploy key (server-only; .ssh sits in the repo because the service account's home is the repo root)
+.ssh/
+
 # Spyder project settings
 .spyderproject
 .spyproject
