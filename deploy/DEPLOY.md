@@ -87,8 +87,8 @@ Only needed on a new server or after a wipe.
    sudo git clone https://github.com/michamettler/BA-FS26_ciel_Mettler_Dialektanalyse.git /opt/dialect-analysis
    sudo chown -R dialectanalysis:dialectanalysis /opt/dialect-analysis
    ```
-3. Audio: stage the clip directories at the paths in the layout table (not in git). The app expects
-   them under `/opt/dialect-analysis/datasets/...` exactly as listed.
+3. Audio: the corpora are not in git. Stage them under `/opt/dialect-analysis/datasets/` following the
+   layout in the parent README's [Datasets](../README.md#datasets) section.
 4. Python env (make `uv` available system-wide first if needed, e.g. `sudo cp "$(command -v uv)" /usr/local/bin/uv`):
    ```bash
    sudo -u dialectanalysis -H sh -c 'cd /opt/dialect-analysis && uv venv && uv pip install -r requirements.txt'
