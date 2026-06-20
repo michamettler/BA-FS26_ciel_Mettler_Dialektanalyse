@@ -1,9 +1,4 @@
-"""Regional Distance helper for Page 2.
-
-Implementation methods: per-sentence alignment cost computation, regional
-aggregates, and chart rendering for the headline plots, summary table, and
-per-sentence cost distribution.
-"""
+"""Regional Distance helpers for Page 2."""
 import sys
 from pathlib import Path
 
@@ -11,12 +6,11 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
-_VIS_DIR = Path(__file__).resolve().parent
+# this module lives in visualization/pages/render_helpers/, so visualization/ is parents[2]
+_VIS_DIR = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(_VIS_DIR))
 from _data import (  # noqa: E402
-    DAT_COLOR, DIT_COLOR, LAMBDA,
-    cost_for_word_pair_by_similarity, epsilon_cost,
-    load_alignments, load_balanced_paths, load_metadata,
+    DAT_COLOR, DIT_COLOR, LAMBDA, per_sentence_cost,
 )
 
 _MODEL_SCALE = alt.Scale(
@@ -25,37 +19,6 @@ _MODEL_SCALE = alt.Scale(
 )
 
 
-@st.cache_data
-def per_sentence_cost(dataset: str) -> pd.DataFrame:
-    """Per-sentence alignment cost for both models."""
-    balanced = load_balanced_paths(dataset)
-    align = load_alignments(dataset)
-    if balanced is not None:
-        balanced_paths = set(balanced["path"])
-        align = align[align["path"].isin(balanced_paths)].copy()
-    else:
-        align = align.copy()
-    align["is_ref"] = align["reference_word"].notna()
-    align["cost"] = cost_for_word_pair_by_similarity(align["similarity"]).fillna(epsilon_cost())
-
-    grouped = (
-        align.groupby(["path", "model"], observed=True)
-        .agg(total_cost=("cost", "sum"), n_ref_words=("is_ref", "sum"))
-        .reset_index()
-    )
-    grouped = grouped[grouped["n_ref_words"] > 0]
-    if balanced is not None:
-        grouped = grouped.merge(balanced, on="path", how="inner")
-    else:
-        # No balanced TSV: pull dialect_region / is_praeteritum from metadata.
-        metadata = load_metadata(dataset)[["path", "dialect_region", "is_praeteritum"]]
-        grouped = grouped.merge(metadata, on="path", how="inner")
-        grouped = grouped[grouped["dialect_region"].notna()]
-    grouped["total_cost_per_ref_word"] = grouped["total_cost"] / grouped["n_ref_words"]
-    return grouped
-
-
-@st.cache_data
 def regional_summary(include_praet: bool, dataset: str) -> pd.DataFrame:
     """Per-region mean total cost (DAT, DIT), total cost delta (DIT − DAT), n. Sorted by delta desc."""
     df = per_sentence_cost(dataset)
@@ -79,6 +42,7 @@ def regional_summary(include_praet: bool, dataset: str) -> pd.DataFrame:
             ("mean_total_cost", "dialect-aware")],
         "n sentences": pivoted[("n_sentences", "dialect-aware")].astype(int),
     })
+
     # Default ordering: dialect signal strongest first.
     return out.sort_values("total cost delta (DIT − DAT)", ascending=False).reset_index()
 
@@ -164,6 +128,7 @@ def render_summary_table(summary: pd.DataFrame, uses_balanced: bool) -> None:
     st.caption(f"Dialect distance per region: per-sentence total alignment cost averaged across {subset_clause} "
                "in the region, plus the DIT-vs-DAT delta.")
     display_table = summary.copy()
+
     for col in ("DAT mean total cost", "DIT mean total cost", "total cost delta (DIT − DAT)"):
         display_table[col] = display_table[col].round(4)
 
@@ -184,6 +149,7 @@ def render_summary_table(summary: pd.DataFrame, uses_balanced: bool) -> None:
         ),
         "n sentences": st.column_config.NumberColumn(help=n_help),
     }
+
     st.dataframe(display_table, hide_index=True, use_container_width=True, column_config=column_config)
     st.caption("Default ordering: descending by **total cost delta (DIT − DAT)**.")
 

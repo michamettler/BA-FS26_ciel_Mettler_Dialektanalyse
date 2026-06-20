@@ -12,10 +12,10 @@ from pathlib import Path
 import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-import _regional_distance as regional  # noqa: E402
+from pages.render_helpers import _regional_distance as regional
 from _data import (  # noqa: E402
-    DATASET_CHOICES, DEFAULT_DATASET,
-    load_alignments, load_balanced_paths,
+    STT4SG, DATASET_CHOICES, DEFAULT_DATASET, REGIONS,
+    load_region_alignments_and_metadata, per_sentence_cost,
 )
 
 # --- Page 2 ---
@@ -29,7 +29,7 @@ dataset = st.sidebar.selectbox(
     key="selected_dataset",
     help="Switch between STT4SG-350 and SDS-200.",
 )
-uses_balanced = load_balanced_paths(dataset) is not None
+uses_balanced = dataset == STT4SG.name # only STT4SG has balanced subset
 regional.render_intro(uses_balanced)
 if not uses_balanced:
     st.warning(
@@ -45,16 +45,18 @@ include_preterite = st.sidebar.toggle(
 
 with st.spinner("Computing per-sentence alignment costs..."):
     summary = regional.regional_summary(include_preterite, dataset)
-    per_sentence = regional.per_sentence_cost(dataset)
+    per_sentence = per_sentence_cost(dataset)
     if not include_preterite:
         per_sentence = per_sentence[~per_sentence["is_praeteritum"].fillna(False).astype(bool)]
 
-align_in_view = load_alignments(dataset)
-align_in_view = align_in_view[align_in_view["path"].isin(set(per_sentence["path"]))]
-st.sidebar.metric("Alignments", f"{len(align_in_view):,}")
+alignments_in_view = load_region_alignments_and_metadata(tuple(REGIONS), dataset, include_dat_dit=False)
+alignments_in_view = alignments_in_view[alignments_in_view["path"].isin(set(per_sentence["path"]))]
+
+st.sidebar.metric("Alignments", f"{len(alignments_in_view):,}")
 st.sidebar.metric("Unique sentences", f"{per_sentence['path'].nunique():,}")
 
 regions_sorted = summary["dialect_region"].tolist()
+
 regional.render_headline_plots(summary, regions_sorted)
 regional.render_summary_table(summary, uses_balanced)
 regional.render_cost_distribution(per_sentence, regions_sorted)

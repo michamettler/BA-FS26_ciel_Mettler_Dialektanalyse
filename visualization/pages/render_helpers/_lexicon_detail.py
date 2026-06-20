@@ -9,15 +9,16 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import streamlit as st
 
-_VIS_DIR = Path(__file__).resolve().parent
+# this module lives in visualization/pages/render_helpers/, so visualization/ is parents[2]
+_VIS_DIR = Path(__file__).resolve().parents[2]
 _REPO_ROOT = _VIS_DIR.parent
 sys.path.insert(0, str(_REPO_ROOT / "scripts" / "domain"))
 sys.path.insert(0, str(_REPO_ROOT / "scripts" / "utils"))
 sys.path.insert(0, str(_VIS_DIR))
 from _auth import audio_unlocked, render_audio_gate  # noqa: E402
 from _data import (  # noqa: E402
-    ALPHA, DATASETS, LAMBDA, REGIONS, USE_GLOBAL_LEXICAL_NORMALIZATION,
-    USE_SQUARED_POSITIONAL, tfidf_matrix_pairs,
+    ALPHA, LAMBDA, REGIONS, USE_GLOBAL_LEXICAL_NORMALIZATION,
+    USE_SQUARED_POSITIONAL, resolve_audio_path, tfidf_matrix_pairs,
 )
 from bipartite_matching import build_full_bipartite_graph, solve_matching  # noqa: E402
 from plot_helpers import plot_reduced_bipartite_graph_with_matching  # noqa: E402
@@ -49,26 +50,15 @@ _LABEL_STYLE = (
 )
 
 
-@st.cache_data
-def _resolve_audio_path(rel_path: str, dataset: str) -> Path | None:
-    """Return the first existing audio file for the row's dataset, or None.
-    Tries the stored path, then `.mp3` as a fallback."""
-    candidates = [rel_path, str(Path(rel_path).with_suffix(".mp3"))]
-    for root in DATASETS[dataset].audio_roots:
-        for cand in candidates:
-            audio = root / cand
-            if audio.exists():
-                return audio
-    return None
-
-
 @st.cache_data(max_entries=64, show_spinner=True)
 def _reduced_graph_png(reference: str, hypothesis: str) -> bytes | None:
     """Run the bipartite solver and return the rendered matching as PNG bytes."""
     ref_words: list[str] = [w for w in (clean_word(t) for t in reference.split()) if w]
     hyp_words: list[str] = [w for w in (clean_word(t) for t in hypothesis.split()) if w]
+
     if not ref_words and not hyp_words:
         return None
+
     calc = WordSimilarityCalculator(
         sent_len=max(len(ref_words), len(hyp_words)),
         alpha=ALPHA, lambda_=LAMBDA,
@@ -77,10 +67,12 @@ def _reduced_graph_png(reference: str, hypothesis: str) -> bytes | None:
     )
     G = build_full_bipartite_graph(ref_words, hyp_words, calc)
     matching = solve_matching(G)
+
     fig = plot_reduced_bipartite_graph_with_matching(G, matching)
     buf = io.BytesIO()
     fig.savefig(buf, format="png", bbox_inches="tight", dpi=110)
     plt.close(fig)
+
     return buf.getvalue()
 
 
@@ -88,8 +80,10 @@ def render_header(word: str, word_rows: pd.DataFrame, selected_regions: list[str
     """Back button, word title, and total alignment-row / sentence count caption."""
     st.button("<- Back to word cloud", on_click=_back_to_cloud, key="back_btn")
     st.markdown(f"### `{word}`")
+
     n_total = len(word_rows)
     n_sentences = word_rows["path"].nunique()
+
     st.caption(f"{n_total:,} alignment rows across {n_sentences:,} sentences "
                f"(in {len(selected_regions)} selected region(s))")
 
@@ -98,23 +92,29 @@ def render_hypothesis_tables(word: str, word_rows: pd.DataFrame, selected_region
                              include_preterite: bool, dataset: str) -> None:
     """Side-by-side DIT/DAT hypothesis-variant tables for the searched reference word."""
     col_dit, col_dat = st.columns(2)
+
     with col_dit:
         st.markdown("**Dialect-Ignorant-Transcript (DIT, Whisper-large-v2)**")
         st.caption("Hypothesis variants the DIT model produced as the alignment of the searched reference word.")
+
         dit_table = _hypothesis_table(
             word_rows[word_rows["model"] == "dialect-ignorant"],
             word, "dialect-ignorant", selected_regions, include_preterite, dataset,
         )
+
         st.dataframe(dit_table, use_container_width=True, hide_index=True,
                      column_config=_HYPOTHESIS_TABLE_COLUMN_CONFIG)
         st.caption("Default ordering: descending by **TF-IDF**.")
+
     with col_dat:
         st.markdown("**Dialect-Aware-Transcript (DAT, FHNW STT4SG)**")
         st.caption("Hypothesis variants the DAT model produced as the alignment of the searched reference word.")
+
         dat_table = _hypothesis_table(
             word_rows[word_rows["model"] == "dialect-aware"],
             word, "dialect-aware", selected_regions, include_preterite, dataset,
         )
+
         st.dataframe(dat_table, use_container_width=True, hide_index=True,
                      column_config=_HYPOTHESIS_TABLE_COLUMN_CONFIG)
         st.caption("Default ordering: descending by **count**.")
@@ -163,13 +163,13 @@ def render_word_chart(word_rows: pd.DataFrame) -> None:
 def render_example_sentences(df_view: pd.DataFrame, word_rows: pd.DataFrame, word: str,
                              selected_regions: list[str], include_preterite: bool,
                              dataset: str) -> None:
-    """Sentences grouped by DIT hypothesis (TF-IDF desc). Two-level pagination: outer pager
-    selects which variants to show; each variant is a collapsible expander with its own inner
-    sentence pager. Matches and deletions sort to the bottom (TF-IDF = 0).
+    """Sentences grouped by DIT hypothesis (TF-IDF desc).
+    Two-level pagination: outer pager selects which variants to show; inner shows sentences.
+    Matches and deletions sort to the bottom (TF-IDF = 0).
     """
     dit_rows = word_rows[word_rows["model"] == "dialect-ignorant"]
-    # Dedupe on (path, _variant) so sentences with multiple occurrences of the searched word
-    # appear under every variant they actually aligned to.
+
+    # Dedupe on (path, _variant) so sentences with multiple occurrences of the searched word appear under every variant.
     unique_paths = (
         dit_rows
         .assign(
@@ -185,6 +185,7 @@ def render_example_sentences(df_view: pd.DataFrame, word_rows: pd.DataFrame, wor
     )
 
     dit_table = _hypothesis_table(dit_rows, word, "dialect-ignorant", selected_regions, include_preterite, dataset)
+
     available_variants = set(unique_paths["_variant"].unique())
     variant_order = [
         v for v in dit_table["hypothesis_word"].fillna("(deletion)").tolist()
@@ -361,10 +362,11 @@ def _render_example_sentence_expander(row: pd.Series, sentence_rows: pd.DataFram
     # SDS-200 demographics are sparse; only show gender/age when present (else they render as "nan").
     demographics = " · ".join(str(v) for v in (row["gender"], row["age"]) if pd.notna(v))
     header = f"**{row['dialect_region']}**" + (f" · {demographics}" if demographics else "") + f" · …{path[-12:]}"
+
     with st.expander(header):
         st.markdown(f"**Clip ID:** `{path}`")
 
-        audio_file = _resolve_audio_path(path, dataset)
+        audio_file = resolve_audio_path(path, dataset)
         if audio_file is None:
             st.caption(f"Audio file not found locally: `{path}`")
         elif not audio_unlocked():
@@ -385,9 +387,11 @@ def _render_example_sentence_expander(row: pd.Series, sentence_rows: pd.DataFram
             f"**Hypothesis DIT:** {row['dit_hypothesis']}  \n"
             f"**Hypothesis DAT:** {row['dat_hypothesis']}"
         )
+
         dat_cols = _alignment_columns(sentence_rows[sentence_rows["model"] == "dialect-aware"])
         dit_cols = _alignment_columns(sentence_rows[sentence_rows["model"] == "dialect-ignorant"])
         dat_dit_cols = _alignment_columns(sentence_rows[sentence_rows["model"] == "dat-dit"])
+
         st.markdown(_render_alignment_html(dit_cols, "Hypothesis DIT", searched_word=word),
                     unsafe_allow_html=True)
         st.markdown(_render_alignment_html(dat_cols, "Hypothesis DAT", searched_word=word),
@@ -398,14 +402,17 @@ def _render_example_sentence_expander(row: pd.Series, sentence_rows: pd.DataFram
 
         if st.checkbox("Show technical alignment", key=f"graph_{path}"):
             png_dit = _reduced_graph_png(row["reference"], row["dit_hypothesis"])
+
             if png_dit is not None:
                 st.markdown("**REF → DIT: reduced bipartite matching**")
                 st.image(png_dit)
             png_dat = _reduced_graph_png(row["reference"], row["dat_hypothesis"])
+
             if png_dat is not None:
                 st.markdown("**REF → DAT: reduced bipartite matching**")
                 st.image(png_dat)
             png_dat_dit = _reduced_graph_png(row["dat_hypothesis"], row["dit_hypothesis"])
+
             if png_dat_dit is not None:
                 st.markdown("**DAT → DIT: reduced bipartite matching**")
                 st.image(png_dat_dit)
