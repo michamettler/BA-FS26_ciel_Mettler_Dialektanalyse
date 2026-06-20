@@ -5,11 +5,14 @@ Run: streamlit run visualization/Home.py
 """
 import streamlit as st
 
-from _auth import require_password
-
 st.set_page_config(page_title="Swiss German Dialect Analysis", layout="wide")
-require_password()
 st.title("Swiss German Dialect Analysis")
+
+st.warning(
+    "**Note:** Audio playback is password-protected because the underlying speech corpora "
+    "(STT4SG-350 and SDS-200) are licensed. Automated downloading or crawling of the audio files "
+    "is not permitted."
+)
 
 st.markdown(
     """
