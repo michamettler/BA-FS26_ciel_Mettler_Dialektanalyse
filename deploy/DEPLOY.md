@@ -22,8 +22,7 @@ Nothing is computed from audio at runtime.
 - A single shared password gates the app so the audio isn't freely crawlable (anti-crawl, not
   per-user login). `visualization/_auth.py` reads it from `/opt/dialect-analysis/.streamlit/secrets.toml`.
   Every page is gated, since Streamlit lets you deep-link straight to a page.
-- Git auth is a repo-scoped **deploy key** at `/opt/dialect-analysis/.ssh/dialect_deploy`, wired via
-  the repo's `core.sshCommand`. No personal GitHub credentials live on the box.
+- Git auth is a repo-scoped **deploy key** at `/opt/dialect-analysis/.ssh/dialect_deploy`.
 - Dependencies live in a uv virtualenv at `/opt/dialect-analysis/.venv`.
 
 ## Server layout
@@ -40,19 +39,17 @@ Everything is under `/opt/dialect-analysis`, owned by `dialectanalysis`.
 | Password | `.streamlit/secrets.toml` | no |
 | Deploy key | `.ssh/dialect_deploy` | no |
 
-The audio, password, and deploy key are not in git; they live only on the server. So a `git pull`
-updates the code and parquets/TSVs but never those.
+The audio, password, and deploy key are not in git; they live only on the server.
 
 ## Operations
 
-The repo is owned by `dialectanalysis`, so run git as that account; `systemctl` needs `sudo`. A handy
-shell alias: `alias dgit='sudo -u dialectanalysis -H git -C /opt/dialect-analysis'`.
+The repo is owned by `dialectanalysis`, so run git as that account; `systemctl` needs `sudo`.
+A handy shell alias: `alias dgit='sudo -u dialectanalysis -H git -C /opt/dialect-analysis'`.
 
 Deploy an update (the common case):
 ```bash
-sudo -u dialectanalysis -H git -C /opt/dialect-analysis pull
-# only if Python dependencies changed:
-sudo -u dialectanalysis -H sh -c 'cd /opt/dialect-analysis && uv pip install -r requirements.txt'
+sudo -u dialectanalysis -H git -C /opt/dialect-analysis pull # or `dgit pull` if alias activated
+sudo -u dialectanalysis -H sh -c 'cd /opt/dialect-analysis && uv pip install -r requirements.txt' # only if Python dependencies changed
 sudo systemctl restart streamlit
 systemctl status streamlit          # expect: active (running)
 ```
