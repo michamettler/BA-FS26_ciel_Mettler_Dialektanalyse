@@ -9,7 +9,6 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import streamlit as st
 
-# this module lives in visualization/pages/render_helpers/, so visualization/ is parents[2]
 _VIS_DIR = Path(__file__).resolve().parents[2]
 _REPO_ROOT = _VIS_DIR.parent
 sys.path.insert(0, str(_REPO_ROOT / "scripts" / "domain"))

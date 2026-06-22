@@ -6,7 +6,6 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
-# this module lives in visualization/pages/render_helpers/, so visualization/ is parents[2]
 _VIS_DIR = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(_VIS_DIR))
 from _data import (  # noqa: E402

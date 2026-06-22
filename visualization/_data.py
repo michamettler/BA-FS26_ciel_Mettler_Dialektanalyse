@@ -124,6 +124,13 @@ def deletion_similarity() -> float:
     return similarity_for_word_pair_by_cost(epsilon_cost())
 
 
+def _filter_preterite(alignments: pd.DataFrame, include_preterite: bool) -> pd.DataFrame:
+    """Filter preterite sentences unless explicitly included."""
+    if include_preterite:
+        return alignments
+    return alignments[~alignments["is_praeteritum"].fillna(False).astype(bool)]
+
+
 # --- Shared loaders (alignments + metadata) ---
 
 def _load_metadata_path_joined(cfg: DatasetConfig) -> pd.DataFrame:
@@ -220,22 +227,21 @@ def tfidf_matrix_pairs(include_preterite: bool, mode: CloudMode, dataset: str) -
         * `smooth_idf=False`: use unsmoothed IDF; terms present in all regions get IDF 1 -> TF-IDF weight 0 after IDF shift.
         * `norm='l2'` (sklearn default): making comparisons across regions meaningful.
     """
-    df = load_region_alignments_and_metadata(tuple(REGIONS), dataset, include_dat_dit=(mode == "dat_dit"))
+    alignments = load_region_alignments_and_metadata(tuple(REGIONS), dataset, include_dat_dit=(mode == "dat_dit"))
 
     # filters
-    if not include_preterite:
-        df = df[~df["is_praeteritum"].fillna(False).astype(bool)]
-    df = df[
-        (df["model"] == MODE_TO_MODEL[mode])
-        & df["reference_word"].notna()
-        & df["hypothesis_word"].notna()
-        & (df["reference_word"] != df["hypothesis_word"])  # filter out matches where ref and hyp are the same word
+    alignments = _filter_preterite(alignments, include_preterite)
+    alignments = alignments[
+        (alignments["model"] == MODE_TO_MODEL[mode])
+        & alignments["reference_word"].notna()
+        & alignments["hypothesis_word"].notna()
+        & (alignments["reference_word"] != alignments["hypothesis_word"])  # filter out matches where ref and hyp are the same word
         ]
 
     # tokens (concatenated ref+hyp)
-    pairs = df["reference_word"] + "+" + df["hypothesis_word"]
+    pairs = alignments["reference_word"] + "+" + alignments["hypothesis_word"]
     # documents (regions)
-    docs_per_region = [" ".join(pairs[df["dialect_region"] == r]) for r in REGIONS]
+    docs_per_region = [" ".join(pairs[alignments["dialect_region"] == r]) for r in REGIONS]
 
     vec = TfidfVectorizer(token_pattern=r"\S+", lowercase=False,
                           sublinear_tf=True, smooth_idf=False)
@@ -253,19 +259,18 @@ def tfidf_matrix_pairs(include_preterite: bool, mode: CloudMode, dataset: str) -
 def pair_region_counts(dataset: str, regions: tuple[str, ...], include_preterite: bool,
                        mode: CloudMode) -> pd.DataFrame | pd.Series:
     """(ref+hyp) pair per region occurrence counts behind the word cloud, cached per filter combo."""
-    df = load_region_alignments_and_metadata(regions, dataset, include_dat_dit=(mode == "dat_dit"))
+    alignments = load_region_alignments_and_metadata(regions, dataset, include_dat_dit=(mode == "dat_dit"))
 
     # filters
-    if not include_preterite:
-        df = df[~df["is_praeteritum"].fillna(False).astype(bool)]
-    df = df[df["model"] == MODE_TO_MODEL[mode]].dropna(subset=["hypothesis_word", "reference_word"])
-    df = df[df["reference_word"] != df["hypothesis_word"]]
+    alignments = _filter_preterite(alignments, include_preterite)
+    alignments = alignments[alignments["model"] == MODE_TO_MODEL[mode]].dropna(subset=["hypothesis_word", "reference_word"])
+    alignments = alignments[alignments["reference_word"] != alignments["hypothesis_word"]]
 
     # tokens (concatenated ref+hyp)
-    pair = df["reference_word"] + "+" + df["hypothesis_word"]
+    pair = alignments["reference_word"] + "+" + alignments["hypothesis_word"]
 
     return (
-        pd.DataFrame({"pair": pair, "dialect_region": df["dialect_region"]})
+        pd.DataFrame({"pair": pair, "dialect_region": alignments["dialect_region"]})
         .groupby(["pair", "dialect_region"], observed=True).size().unstack(fill_value=0)
     )
 
@@ -273,16 +278,14 @@ def pair_region_counts(dataset: str, regions: tuple[str, ...], include_preterite
 @st.cache_data
 def lexicon_search_index(dataset: str, regions: tuple[str, ...], include_preterite: bool):
     """Page-1 search aggregates: ref-word frequency table and sidebar metric counts, cached per filter combo."""
-    df = load_region_alignments_and_metadata(regions, dataset, include_dat_dit=False)
-
-    if not include_preterite:
-        df = df[~df["is_praeteritum"].fillna(False).astype(bool)]
+    alignments = load_region_alignments_and_metadata(regions, dataset, include_dat_dit=False)
+    alignments = _filter_preterite(alignments, include_preterite)
 
     ref_counts = (
-        df[df["reference_word"].notna()]
+        alignments[alignments["reference_word"].notna()]
         .groupby("reference_word").size().sort_values(ascending=False)
     )
-    return ref_counts, int(len(df)), int(df["path"].nunique())
+    return ref_counts, int(len(alignments)), int(alignments["path"].nunique())
 
 
 @st.cache_data
@@ -322,6 +325,7 @@ def per_sentence_cost(dataset: str) -> pd.DataFrame:
     if uses_balanced:
         # filter to the balanced subset
         alignments = alignments[alignments["path"].isin(set(load_balanced_paths(dataset)["path"]))]
+
     # copy (because of cache) + keep only relevant columns
     alignments = alignments[
         ["path", "model", "similarity", "reference_word", "dialect_region", "is_praeteritum"]].copy()

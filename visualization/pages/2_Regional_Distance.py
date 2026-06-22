@@ -2,9 +2,7 @@
 Regional Distance from Standard German: Page 2.
 
 Dialect distance per region, computed as the mean of (per-sentence total alignment cost / sentence's ref-word count)
-across all sentences in the region. STT4SG-350 restricts to the train_balanced subset
-(~25k sentences per region) for comparable samples; SDS-200 has no balanced subset and runs on the
-full filtered set (caveat banner shown).
+across all sentences in the region.
 """
 import sys
 from pathlib import Path
