@@ -15,7 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from pages.render_helpers import _lexicon_detail as detail, _lexicon_overview as overview
 from _data import (  # noqa: E402
     DATASET_CHOICES, DEFAULT_DATASET, REGION_COLORS, REGIONS,
-    CloudMode, load_region_alignments_and_metadata, lexicon_search_index,
+    CloudMode, filter_preterite, load_region_alignments_and_metadata, lexicon_search_index,
 )
 
 
@@ -114,8 +114,7 @@ def render_overview(regions: list[str], include_preterite: bool, dataset: str) -
 if selected_word:
     # Full frame needed only for the detail view; load it lazily here.
     df = load_region_alignments_and_metadata(tuple(selected_regions), dataset, include_dat_dit=True)
-    if not include_preterite:
-        df = df[~df["is_praeteritum"].isin([True, "True"])]
+    df = filter_preterite(df, include_preterite)
     render_detail(df, selected_word, selected_regions, include_preterite, dataset)
 else:
     render_overview(selected_regions, include_preterite, dataset)
