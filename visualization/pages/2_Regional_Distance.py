@@ -2,7 +2,7 @@
 Regional Distance from Standard German: Page 2.
 
 Dialect distance per region, computed as the mean of (per-sentence total alignment cost / sentence's ref-word count)
-across all sentences in the region.
+across all selected sentences (balanced subset for STT4SG) in the region.
 """
 import sys
 from pathlib import Path
