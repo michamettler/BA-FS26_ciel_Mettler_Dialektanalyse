@@ -2,9 +2,7 @@
 Regional Distance from Standard German: Page 2.
 
 Dialect distance per region, computed as the mean of (per-sentence total alignment cost / sentence's ref-word count)
-across all sentences in the region. STT4SG-350 restricts to the train_balanced subset
-(~25k sentences per region) for comparable samples; SDS-200 has no balanced subset and runs on the
-full filtered set (caveat banner shown).
+across all selected sentences (balanced subset for STT4SG) in the region.
 """
 import sys
 from pathlib import Path
@@ -15,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from pages.render_helpers import _regional_distance as regional
 from _data import (  # noqa: E402
     STT4SG, DATASET_CHOICES, DEFAULT_DATASET, REGIONS,
-    load_region_alignments_and_metadata, per_sentence_cost,
+    filter_preterite, load_region_alignments_and_metadata, per_sentence_cost,
 )
 
 # --- Page 2 ---
@@ -45,9 +43,7 @@ include_preterite = st.sidebar.toggle(
 
 with st.spinner("Computing per-sentence alignment costs..."):
     summary = regional.regional_summary(include_preterite, dataset)
-    per_sentence = per_sentence_cost(dataset)
-    if not include_preterite:
-        per_sentence = per_sentence[~per_sentence["is_praeteritum"].fillna(False).astype(bool)]
+    per_sentence = filter_preterite(per_sentence_cost(dataset), include_preterite)
 
 alignments_in_view = load_region_alignments_and_metadata(tuple(REGIONS), dataset, include_dat_dit=False)
 alignments_in_view = alignments_in_view[alignments_in_view["path"].isin(set(per_sentence["path"]))]

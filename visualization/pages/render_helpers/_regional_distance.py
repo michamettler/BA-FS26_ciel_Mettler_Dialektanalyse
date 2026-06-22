@@ -6,11 +6,10 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
-# this module lives in visualization/pages/render_helpers/, so visualization/ is parents[2]
 _VIS_DIR = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(_VIS_DIR))
 from _data import (  # noqa: E402
-    DAT_COLOR, DIT_COLOR, LAMBDA, per_sentence_cost,
+    DAT_COLOR, DIT_COLOR, LAMBDA, filter_preterite, per_sentence_cost,
 )
 
 _MODEL_SCALE = alt.Scale(
@@ -21,9 +20,7 @@ _MODEL_SCALE = alt.Scale(
 
 def regional_summary(include_praet: bool, dataset: str) -> pd.DataFrame:
     """Per-region mean total cost (DAT, DIT), total cost delta (DIT − DAT), n. Sorted by delta desc."""
-    df = per_sentence_cost(dataset)
-    if not include_praet:
-        df = df[~df["is_praeteritum"].fillna(False).astype(bool)]
+    df = filter_preterite(per_sentence_cost(dataset), include_praet)
 
     summary = (
         df.groupby(["dialect_region", "model"], observed=True)
