@@ -124,7 +124,7 @@ def deletion_similarity() -> float:
     return similarity_for_word_pair_by_cost(epsilon_cost())
 
 
-def _filter_preterite(alignments: pd.DataFrame, include_preterite: bool) -> pd.DataFrame:
+def filter_preterite(alignments: pd.DataFrame, include_preterite: bool) -> pd.DataFrame:
     """Filter preterite sentences unless explicitly included."""
     if include_preterite:
         return alignments
@@ -230,7 +230,7 @@ def tfidf_matrix_pairs(include_preterite: bool, mode: CloudMode, dataset: str) -
     alignments = load_region_alignments_and_metadata(tuple(REGIONS), dataset, include_dat_dit=(mode == "dat_dit"))
 
     # filters
-    alignments = _filter_preterite(alignments, include_preterite)
+    alignments = filter_preterite(alignments, include_preterite)
     alignments = alignments[
         (alignments["model"] == MODE_TO_MODEL[mode])
         & alignments["reference_word"].notna()
@@ -262,7 +262,7 @@ def pair_region_counts(dataset: str, regions: tuple[str, ...], include_preterite
     alignments = load_region_alignments_and_metadata(regions, dataset, include_dat_dit=(mode == "dat_dit"))
 
     # filters
-    alignments = _filter_preterite(alignments, include_preterite)
+    alignments = filter_preterite(alignments, include_preterite)
     alignments = alignments[alignments["model"] == MODE_TO_MODEL[mode]].dropna(subset=["hypothesis_word", "reference_word"])
     alignments = alignments[alignments["reference_word"] != alignments["hypothesis_word"]]
 
@@ -279,7 +279,7 @@ def pair_region_counts(dataset: str, regions: tuple[str, ...], include_preterite
 def lexicon_search_index(dataset: str, regions: tuple[str, ...], include_preterite: bool):
     """Page-1 search aggregates: ref-word frequency table and sidebar metric counts, cached per filter combo."""
     alignments = load_region_alignments_and_metadata(regions, dataset, include_dat_dit=False)
-    alignments = _filter_preterite(alignments, include_preterite)
+    alignments = filter_preterite(alignments, include_preterite)
 
     ref_counts = (
         alignments[alignments["reference_word"].notna()]

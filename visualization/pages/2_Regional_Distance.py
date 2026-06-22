@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from pages.render_helpers import _regional_distance as regional
 from _data import (  # noqa: E402
     STT4SG, DATASET_CHOICES, DEFAULT_DATASET, REGIONS,
-    load_region_alignments_and_metadata, per_sentence_cost,
+    filter_preterite, load_region_alignments_and_metadata, per_sentence_cost,
 )
 
 # --- Page 2 ---
@@ -43,9 +43,7 @@ include_preterite = st.sidebar.toggle(
 
 with st.spinner("Computing per-sentence alignment costs..."):
     summary = regional.regional_summary(include_preterite, dataset)
-    per_sentence = per_sentence_cost(dataset)
-    if not include_preterite:
-        per_sentence = per_sentence[~per_sentence["is_praeteritum"].isin([True, "True"])]
+    per_sentence = filter_preterite(per_sentence_cost(dataset), include_preterite)
 
 alignments_in_view = load_region_alignments_and_metadata(tuple(REGIONS), dataset, include_dat_dit=False)
 alignments_in_view = alignments_in_view[alignments_in_view["path"].isin(set(per_sentence["path"]))]
