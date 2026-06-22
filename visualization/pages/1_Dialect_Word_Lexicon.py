@@ -115,7 +115,7 @@ if selected_word:
     # Full frame needed only for the detail view; load it lazily here.
     df = load_region_alignments_and_metadata(tuple(selected_regions), dataset, include_dat_dit=True)
     if not include_preterite:
-        df = df[~df["is_praeteritum"].fillna(False).astype(bool)]
+        df = df[~df["is_praeteritum"].isin([True, "True"])]
     render_detail(df, selected_word, selected_regions, include_preterite, dataset)
 else:
     render_overview(selected_regions, include_preterite, dataset)

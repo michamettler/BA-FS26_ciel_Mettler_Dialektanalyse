@@ -128,7 +128,7 @@ def _filter_preterite(alignments: pd.DataFrame, include_preterite: bool) -> pd.D
     """Filter preterite sentences unless explicitly included."""
     if include_preterite:
         return alignments
-    return alignments[~alignments["is_praeteritum"].fillna(False).astype(bool)]
+    return alignments[~alignments["is_praeteritum"].isin([True, "True"])]
 
 
 # --- Shared loaders (alignments + metadata) ---

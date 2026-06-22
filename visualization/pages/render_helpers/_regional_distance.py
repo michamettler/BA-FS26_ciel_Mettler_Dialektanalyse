@@ -22,7 +22,7 @@ def regional_summary(include_praet: bool, dataset: str) -> pd.DataFrame:
     """Per-region mean total cost (DAT, DIT), total cost delta (DIT − DAT), n. Sorted by delta desc."""
     df = per_sentence_cost(dataset)
     if not include_praet:
-        df = df[~df["is_praeteritum"].fillna(False).astype(bool)]
+        df = df[~df["is_praeteritum"].isin([True, "True"])]
 
     summary = (
         df.groupby(["dialect_region", "model"], observed=True)
