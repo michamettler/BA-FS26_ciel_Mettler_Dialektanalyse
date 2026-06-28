@@ -16,7 +16,7 @@ Nothing is computed from audio at runtime.
 - Runs under the **`dialectanalysis`** service account (no login shell), which also owns the files.
 - A systemd service named `streamlit` runs it: restarts on crash (`Restart=always`) and starts on
   boot (`enable`).
-- Plain HTTP on port 80, no reverse proxy. Reachable at `http://<server-hostname>` from the ZHAW
+- Plain HTTP on port 80. Reachable at `http://<server-hostname>` from the ZHAW
   network or VPN (`hostname -f` prints the address). The unit grants `CAP_NET_BIND_SERVICE` so it
   binds port 80 without running as root.
 - A single shared password gates **audio playback** (anti-crawl for the licensed corpora).
