@@ -54,9 +54,9 @@ uv pip install -r requirements.txt
 
 ### Datasets
 
-The two speech corpora are **not** in the repository (the audio is large and licensed). Obtain them
-from their sources and place them under `datasets/` in the layout below. The metadata `.tsv` files
-are committed; the **audio directories** are what you add.
+The two speech corpora are **not** in the repository (the audio is large and licensed). They must be
+obtained from their sources and placed under `datasets/` in the layout below. The metadata `.tsv` files
+are committed; the **audio directories** are not.
 
 ```
 datasets/
