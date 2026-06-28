@@ -109,5 +109,5 @@ Only needed on a new server or after a wipe.
 | Audio won't unlock ("no password is configured" at the audio prompt) | `/opt/dialect-analysis/.streamlit/secrets.toml` is missing or has no `password`. Only audio is gated — the app itself still loads. Set the password and restart. |
 | Browser stuck on "connecting" or reconnect loop | The process was killed (often out of memory) and restarted. Look for `oom` in `journalctl -u streamlit -e` and check `free -h`. |
 | "Audio file not found locally" on a clip | That corpus's audio isn't staged at the expected `datasets/...` path. |
-| `git pull` says "dubious ownership" | You ran git as the wrong user. Run it as the owner: `sudo -u dialectanalysis -H git -C /opt/dialect-analysis pull`. |
+| `git pull` says "dubious ownership" | Git was run as the wrong user. Run it as the owner: `sudo -u dialectanalysis -H git -C /opt/dialect-analysis pull`. |
 | Slow on the first open after a restart | Expected. The first visit warms an in-memory cache (data load and TF-IDF); later interactions are fast. |
