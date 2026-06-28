@@ -82,11 +82,6 @@ Naming conventions:
 - `clips__train_valid-001` / `clips__test` (STT4SG-350) and `export_20211220_clips-001` (SDS-200) are
   the audio directories. Each holds the `<uuid>/<hash>.{flac,mp3}` files referenced by the metadata
   (`path` in STT4SG-350, `clip_path` in SDS-200).
-- SDS-200 is a dated export: `export_20211220.tsv` is the metadata and `export_20211220_clips-001`
-  the matching audio. Column meanings are documented in the corpus's own `README_columns.txt`.
-- SDS-200 split definitions (see `splits/README_splits.txt`): `train = train_clean + train_other +
-  train_unvalidated`, and `train_removed = train_raw - train` (so `train_raw` is the full set and
-  `train_removed` the clips left out of `train`).
 
 The visualization only needs the audio directories (for playback); the `.tsv` files and `splits/`
 support the transcription and alignment pipeline.
