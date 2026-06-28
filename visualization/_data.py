@@ -223,9 +223,9 @@ def tfidf_matrix_pairs(include_preterite: bool, mode: CloudMode, dataset: str) -
     """TF-IDF over alignment pairs across the 7 dialect regions for the given dataset.
 
     Vectorizer config:
-        * `sublinear_tf=True`: to damp very frequent pairs.
-        * `smooth_idf=False`: use unsmoothed IDF; terms present in all regions get IDF 1 -> TF-IDF weight 0 after IDF shift.
-        * `norm='l2'` (sklearn default): making comparisons across regions meaningful.
+        * `sublinear_tf=True`: damp very frequent pairs via 1 + ln(tf).
+        * `smooth_idf=False`: use unsmoothed IDF (`idf = log(n / df) + 1`).
+        * `norm='l2'` (sklearn default): makes cross-region comparisons meaningful.
     """
     alignments = load_region_alignments_and_metadata(tuple(REGIONS), dataset, include_dat_dit=(mode == "dat_dit"))
 

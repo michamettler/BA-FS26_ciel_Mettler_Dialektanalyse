@@ -15,14 +15,11 @@ Nothing is computed from audio at runtime.
 - One long-running Streamlit process (Python, serves HTTP and uses WebSockets for live updates).
 - Runs under the **`dialectanalysis`** service account (no login shell), which also owns the files.
 - A systemd service named `streamlit` runs it: restarts on crash (`Restart=always`) and starts on
-  boot (`enable`). It is never started by hand.
+  boot (`enable`).
 - Plain HTTP on port 80, no reverse proxy. Reachable at `http://<server-hostname>` from the ZHAW
   network or VPN (`hostname -f` prints the address). The unit grants `CAP_NET_BIND_SERVICE` so it
   binds port 80 without running as root.
-- A single shared password gates the app so the audio isn't freely crawlable (anti-crawl, not
-  per-user login). `visualization/_auth.py` reads it from `/opt/dialect-analysis/.streamlit/secrets.toml`.
-  Every page is gated, since Streamlit lets you deep-link straight to a page.
-- Git auth is a repo-scoped **deploy key** at `/opt/dialect-analysis/.ssh/dialect_deploy`, wired via the repo's `core.sshCommand` (so no personal GitHub credentials live on the box).
+- A single shared password gates **audio playback** (anti-crawl for the licensed corpora).
 - Dependencies live in a uv virtualenv at `/opt/dialect-analysis/.venv`.
 
 ## Server layout
@@ -37,9 +34,8 @@ Everything is under `/opt/dialect-analysis`, owned by `dialectanalysis`.
 | Audio clips (~41 GB) | `datasets/STT4SG-350 v2.1/clips__*`, `datasets/SDS-200 Corpus/export_20211220_clips-001` | no |
 | Python env (uv) | `.venv` | no |
 | Password | `.streamlit/secrets.toml` | no |
-| Deploy key | `.ssh/dialect_deploy` | no |
 
-The audio, password, and deploy key are not in git; they live only on the server.
+The audio and password are not in git; they live only on the server.
 
 ## Operations
 
@@ -95,35 +91,22 @@ Only needed on a new server or after a wipe.
    printf 'password = "<pick>"\n' | sudo -u dialectanalysis tee /opt/dialect-analysis/.streamlit/secrets.toml >/dev/null
    sudo chmod 600 /opt/dialect-analysis/.streamlit/secrets.toml
    ```
-6. Deploy key (repo-scoped, write-enabled):
-   ```bash
-   sudo -u dialectanalysis -H mkdir -p /opt/dialect-analysis/.ssh && sudo -u dialectanalysis chmod 700 /opt/dialect-analysis/.ssh
-   sudo -u dialectanalysis -H ssh-keygen -t ed25519 -f /opt/dialect-analysis/.ssh/dialect_deploy -N "" -C "ZHAW dialect-analysis server"
-   sudo -u dialectanalysis cat /opt/dialect-analysis/.ssh/dialect_deploy.pub
-   ```
-   Add that public key on GitHub: repo -> Settings -> Deploy keys -> Add deploy key -> Allow write access. Then:
-   ```bash
-   sudo -u dialectanalysis git -C /opt/dialect-analysis config core.sshCommand "ssh -i /opt/dialect-analysis/.ssh/dialect_deploy -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
-   sudo -u dialectanalysis git -C /opt/dialect-analysis remote set-url origin git@github.com:michamettler/BA-FS26_ciel_Mettler_Dialektanalyse.git
-   sudo -u dialectanalysis git -C /opt/dialect-analysis config user.name  "ZHAW Server"
-   sudo -u dialectanalysis git -C /opt/dialect-analysis config user.email "noreply@dialectanalysis-bipartitematching.engineering.zhaw.ch"
-   ```
-7. Service:
+6. Service:
    ```bash
    sudo cp /opt/dialect-analysis/deploy/streamlit.service /etc/systemd/system/
    sudo systemctl daemon-reload && sudo systemctl enable --now streamlit
    ```
-8. Firewall: open 80 to the internal subnet with `sudo ufw allow 80/tcp` (firewalld:
+7. Firewall: open 80 to the internal subnet with `sudo ufw allow 80/tcp` (firewalld:
    `sudo firewall-cmd --add-port=80/tcp --permanent && sudo firewall-cmd --reload`).
-9. Check: `curl -sI http://localhost` returns `HTTP/1.1 200`, then open `http://<server-hostname>` in
-   a browser and the password prompt shows.
+8. Check: `curl -sI http://localhost` returns `HTTP/1.1 200`, then open `http://<server-hostname>` in
+   a browser and the app loads (audio playback prompts for the password; the rest is open).
 
 ## Troubleshooting
 
 | Symptom | What to check |
 |---|---|
 | Service won't start (`status` = failed) | `journalctl -u streamlit -e`. Usually a wrong path in the unit, a bind error on port 80 (check `sudo ss -ltnp` for another listener), or a missing venv (rebuild step 4). |
-| App loads but shows "Access is not configured" | `/opt/dialect-analysis/.streamlit/secrets.toml` is missing or has no `password`. Recreate it and restart. |
+| Audio won't unlock ("no password is configured" at the audio prompt) | `/opt/dialect-analysis/.streamlit/secrets.toml` is missing or has no `password`. Only audio is gated — the app itself still loads. Set the password and restart. |
 | Browser stuck on "connecting" or reconnect loop | The process was killed (often out of memory) and restarted. Look for `oom` in `journalctl -u streamlit -e` and check `free -h`. |
 | "Audio file not found locally" on a clip | That corpus's audio isn't staged at the expected `datasets/...` path. |
 | `git pull` says "dubious ownership" | You ran git as the wrong user. Run it as the owner: `sudo -u dialectanalysis -H git -C /opt/dialect-analysis pull`. |

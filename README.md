@@ -111,8 +111,8 @@ The full reproduction procedure (calibration => alignment => visualization) is d
 
 ## Interactive Web Tool
 
-**Access (ZHAW-internal, password-gated):** http://160.85.66.77
-(temporary IP; a DNS name will replace it later.)
+**Access (ZHAW-internal):** http://dialectanalysis-bipartitematching.engineering.zhaw.ch
+Audio playback is password-gated; the rest of the tool is open within the ZHAW network.
 
 The Streamlit application provides interactive access to the analysis results:
 a word-cloud overview of dialect-distinctive substitution pairs, a per-word
@@ -125,5 +125,5 @@ To run the tool locally after completing setup:
 streamlit run visualization/Home.py
 ```
 
-For the ZHAW-internal server deployment (HTTP, password-gated), see
+For the ZHAW-internal server deployment (HTTP), see
 [`deploy/DEPLOY.md`](deploy/DEPLOY.md).
