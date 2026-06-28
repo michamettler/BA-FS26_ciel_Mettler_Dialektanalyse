@@ -12,9 +12,11 @@ import pandas as pd
 import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-import _lexicon_detail as detail  # noqa: E402
-import _lexicon_overview as overview  # noqa: E402
-from _data import REGION_COLORS, REGIONS, CloudMode, joined_view  # noqa: E402
+from pages.render_helpers import _lexicon_detail as detail, _lexicon_overview as overview
+from _data import (  # noqa: E402
+    DATASET_CHOICES, DEFAULT_DATASET, REGION_COLORS, REGIONS,
+    CloudMode, filter_preterite, load_region_alignments_and_metadata, lexicon_search_index,
+)
 
 
 # --- Page 1 ---
@@ -22,6 +24,14 @@ st.set_page_config(page_title="Dialect Word Lexicon", layout="wide")
 st.title("Dialect Word Lexicon")
 
 # Sidebar filters
+dataset = st.sidebar.selectbox(
+    "Dataset",
+    DATASET_CHOICES,
+    index=DATASET_CHOICES.index(DEFAULT_DATASET),
+    key="selected_dataset",
+    help="Switch between STT4SG-350 and SDS-200.",
+)
+
 region_filter = st.sidebar.multiselect(
     "Filter regions",
     REGIONS,
@@ -46,23 +56,13 @@ include_preterite = st.sidebar.toggle(
          "can introduce noise in the transcripts. Exclude them to focus on dialect specifics; include for more data.")
 
 with st.spinner("Loading alignment data..."):
-    df = joined_view(tuple(selected_regions), include_dat_dit=True)
+    # Cached per (dataset, regions, preterite): ref-word frequencies + sidebar counts.
+    ref_counts, n_alignments, n_sentences = lexicon_search_index(
+        dataset, tuple(selected_regions), include_preterite
+    )
 
-if not include_preterite:
-    df = df[~df["is_praeteritum"].fillna(False).astype(bool)]
-
-ref_only = df[df["model"] != "dat-dit"]
-
-st.sidebar.metric("Alignments", f"{len(ref_only):,}")
-st.sidebar.metric("Unique sentences", f"{df['path'].nunique():,}")
-
-# Reference-word frequencies (substitution + deletion edges only: drop insertions where ref_word is NA (epsilon))
-ref_counts = (
-    ref_only[ref_only["reference_word"].notna()]
-    .groupby("reference_word")
-    .size()
-    .sort_values(ascending=False)
-)
+st.sidebar.metric("Alignments", f"{n_alignments:,}")
+st.sidebar.metric("Unique sentences", f"{n_sentences:,}")
 
 # Search box
 search_options = [""] + ref_counts.index.tolist()
@@ -80,16 +80,17 @@ if st.session_state.get("_prev_selected_word") != selected_word:
 
 
 def render_detail(df_view: pd.DataFrame, word: str, regions: list[str],
-                  include_preterite: bool) -> None:
+                  include_preterite: bool, dataset: str) -> None:
     """Per-reference-word detail view: header, hypothesis tables, charts, regional table, examples."""
     word_rows = df_view[(df_view["reference_word"] == word) & (df_view["model"] != "dat-dit")]
+
     detail.render_header(word, word_rows, regions)
     detail.render_word_chart(word_rows)
-    detail.render_hypothesis_tables(word, word_rows, regions, include_preterite)
-    detail.render_example_sentences(df_view, word_rows, word, regions, include_preterite)
+    detail.render_hypothesis_tables(word, word_rows, regions, include_preterite, dataset)
+    detail.render_example_sentences(df_view, word_rows, word, regions, include_preterite, dataset)
 
 
-def render_overview(df_view: pd.DataFrame, regions: list[str], include_preterite: bool) -> None:
+def render_overview(regions: list[str], include_preterite: bool, dataset: str) -> None:
     """Word-cloud overview of regionally distinctive substitution pairs."""
     mode_label = st.radio(
         "Compare",
@@ -98,16 +99,22 @@ def render_overview(df_view: pd.DataFrame, regions: list[str], include_preterite
         key="cloud_mode",
     )
     mode: CloudMode = "ref_dit" if mode_label.startswith("Reference") else "dat_dit"
+
     overview.render_caption(mode)
-    table = overview.compute_top_table(df_view, regions, include_preterite, mode)
+    table = overview.compute_top_table(regions, include_preterite, mode, dataset)
+
     if table.empty:
         st.warning("No regionally distinctive pairs in the selected regions.")
         return
+
     overview.render_word_cloud(table)
     overview.render_top_candidates_expander(table, mode)
 
 
 if selected_word:
-    render_detail(df, selected_word, selected_regions, include_preterite)
+    # Full frame needed only for the detail view; load it lazily here.
+    df = load_region_alignments_and_metadata(tuple(selected_regions), dataset, include_dat_dit=True)
+    df = filter_preterite(df, include_preterite)
+    render_detail(df, selected_word, selected_regions, include_preterite, dataset)
 else:
-    render_overview(df, selected_regions, include_preterite)
+    render_overview(selected_regions, include_preterite, dataset)

@@ -145,6 +145,9 @@ celerybeat.pid
 # SageMath parsed files
 *.sage.py
 
+# Streamlit secrets (deployment password lives here; created on the server only)
+.streamlit/secrets.toml
+
 # Environments
 .env
 .envrc
@@ -154,6 +157,9 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+
+# SSH deploy key (server-only; .ssh sits in the repo because the service account's home is the repo root)
+.ssh/
 
 # Spyder project settings
 .spyderproject
